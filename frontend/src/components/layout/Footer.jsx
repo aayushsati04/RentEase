@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 const quickLinks = [
   { label: 'Browse Properties', href: '/properties' },
   { label: 'List Your Property', href: '/register' },
+  { label: 'About Us', href: '/about' },
   { label: 'How It Works', href: '/#how-it-works' },
   { label: 'Pricing', href: '/#pricing' },
-  { label: 'Blog', href: '#' },
 ];
 
 const propertyTypes = [
@@ -58,13 +58,7 @@ const socials = [
 
 export default function Footer() {
   return (
-    <footer className="relative bg-slate-950 border-t border-white/5 mt-auto">
-      {/* Gradient top line */}
-      <div className="h-px bg-gradient-to-r from-transparent via-primary-500/60 to-transparent" />
-
-      {/* Subtle glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-px bg-primary-500/40 blur-sm" />
-
+    <footer className="relative bg-slate-800 border-t border-slate-700/60 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
           {/* Brand Column */}
@@ -86,8 +80,8 @@ export default function Footer() {
                   href={s.href}
                   aria-label={s.name}
                   className="w-9 h-9 glass rounded-xl flex items-center justify-center text-slate-400
-                             hover:text-white hover:border-primary-500/40 hover:bg-primary-500/10
-                             transition-all duration-200 border border-transparent"
+                             hover:text-primary-700 hover:bg-slate-800
+                             transition-all duration-200 border border-slate-700/60"
                 >
                   {s.icon}
                 </a>

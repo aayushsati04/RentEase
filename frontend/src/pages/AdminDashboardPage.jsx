@@ -1,30 +1,112 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('approvals');
-  
-  // Pending verification queue
-  const [queue, setQueue] = useState([
-    { id: 1, title: 'Luxury Penthouse Suite', host: 'Rohan Malhotra', type: 'Apartment', price: 85000, date: '2026-06-10' },
-    { id: 2, title: 'Modern Sea-View Villa', host: 'Rahul Mehta', type: 'Villa', price: 65000, date: '2026-06-09' },
-    { id: 3, title: 'Contemporary Studio Loft', host: 'Ananya Krishnan', type: 'Studio', price: 22000, date: '2026-06-09' }
-  ]);
+  const [queue, setQueue] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState([]);
 
-  const handleApprove = (id, title) => {
-    setQueue(prev => prev.filter(item => item.id !== id));
-    toast.success(`Approved: "${title}" is now live & verified!`);
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      
+      // 1. Fetch unverified listings for the approval queue
+      const { data: qData, error: qErr } = await supabase
+        .from('properties')
+        .select('*, owner:owner_id(name)')
+        .eq('is_verified', false);
+
+      if (qErr) throw qErr;
+
+      const queueMapped = (qData || []).map(p => ({
+        id: p.id,
+        title: p.title,
+        host: p.owner?.name || 'Rohan Malhotra',
+        type: p.type,
+        price: Number(p.rent),
+        date: p.created_at.split('T')[0]
+      }));
+      setQueue(queueMapped);
+
+      // 2. Aggregate statistics
+      const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+      const { count: liveCount } = await supabase.from('properties').select('*', { count: 'exact', head: true }).eq('is_verified', true);
+
+      setStats([
+        { label: 'Total Registered Users', value: (usersCount || 0).toString(), icon: '👥', color: 'from-blue-600/10 to-indigo-600/10' },
+        { label: 'Live Property Listings', value: (liveCount || 0).toString(), icon: '🏠', color: 'from-emerald-600/10 to-teal-600/10' },
+        { label: 'Queue For Approvals', value: queueMapped.length.toString(), icon: '⏳', color: 'from-amber-600/10 to-orange-600/10' },
+        { label: 'System Check Logs', value: '0 Errors', icon: '🛡️', color: 'from-rose-600/10 to-pink-600/10' },
+      ]);
+
+    } catch (err) {
+      console.error('Error fetching admin dashboard details:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReject = (id, title) => {
-    setQueue(prev => prev.filter(item => item.id !== id));
-    toast.error(`Rejected: "${title}" listing request declined.`);
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
+  const handleApprove = async (id, title) => {
+    try {
+      const { error } = await supabase
+        .from('properties')
+        .update({ is_verified: true })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setQueue(prev => prev.filter(item => item.id !== id));
+      toast.success(`Approved: "${title}" is now live & verified!`);
+      
+      // Refresh statistics
+      fetchAdminData();
+    } catch (err) {
+      console.error('Error approving property:', err);
+      toast.error('Failed to approve property');
+    }
+  };
+
+  const handleReject = async (id, title) => {
+    try {
+      const { error } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setQueue(prev => prev.filter(item => item.id !== id));
+      toast.error(`Rejected: "${title}" listing request declined.`);
+      
+      // Refresh statistics
+      fetchAdminData();
+    } catch (err) {
+      console.error('Error rejecting property:', err);
+      toast.error('Failed to reject property');
+    }
   };
 
   const handleToolAction = (name) => {
     toast.success(`Executed: "${name}" completed successfully.`);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-400 text-sm">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-16">
@@ -48,12 +130,7 @@ export default function AdminDashboardPage() {
 
         {/* Metrics Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Total Registered Users', value: '4,890', icon: '👥', color: 'from-blue-600/10 to-indigo-600/10' },
-            { label: 'Live Property Listings', value: '10,480', icon: '🏠', color: 'from-emerald-600/10 to-teal-600/10' },
-            { label: 'Queue For Approvals', value: queue.length, icon: '⏳', color: 'from-amber-600/10 to-orange-600/10' },
-            { label: 'System Check Logs', value: '0 Errors', icon: '🛡️', color: 'from-rose-600/10 to-pink-600/10' },
-          ].map((stat, i) => (
+          {stats.map((stat, i) => (
             <div key={i} className={`glass p-5 rounded-2xl border border-white/8 bg-gradient-to-br ${stat.color} shadow-glass`}>
               <div className="text-2xl mb-1">{stat.icon}</div>
               <div className="text-2xl font-black text-white">{stat.value}</div>

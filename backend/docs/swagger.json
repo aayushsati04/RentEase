@@ -1,0 +1,259 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "RentEase MERN Backend API",
+    "version": "1.0.0",
+    "description": "Production-grade, highly secure, scalable REST API for RentEase property rental platform."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password", "phone"],
+                "properties": {
+                  "name": { "type": "string", "example": "John Doe" },
+                  "email": { "type": "string", "format": "email", "example": "john@example.com" },
+                  "password": { "type": "string", "minLength": 6, "example": "password123" },
+                  "phone": { "type": "string", "example": "1234567890" },
+                  "role": { "type": "string", "enum": ["tenant", "landlord"], "default": "tenant" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User registered successfully" },
+          "400": { "description": "Invalid input parameters" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Authenticate user & return token",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email", "example": "john@example.com" },
+                  "password": { "type": "string", "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/auth/profile": {
+      "get": {
+        "summary": "Get authenticated user profile details",
+        "tags": ["Authentication"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Profile retrieved successfully" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/properties": {
+      "get": {
+        "summary": "Retrieve paginated verified properties list",
+        "tags": ["Properties"],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Keyword search across title, location, description" },
+          { "name": "location", "in": "query", "schema": { "type": "string" } },
+          { "name": "type", "in": "query", "schema": { "type": "string" } },
+          { "name": "minRent", "in": "query", "schema": { "type": "number" } },
+          { "name": "maxRent", "in": "query", "schema": { "type": "number" } },
+          { "name": "bedrooms", "in": "query", "schema": { "type": "integer" } },
+          { "name": "bathrooms", "in": "query", "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["available", "booked"] } },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["newest", "oldest", "price-asc", "price-desc", "rating-desc"] } }
+        ],
+        "responses": {
+          "200": { "description": "Properties list retrieved successfully" }
+        }
+      },
+      "post": {
+        "summary": "Create a new property listing",
+        "tags": ["Properties"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description", "rent", "location", "bedrooms", "bathrooms", "area"],
+                "properties": {
+                  "title": { "type": "string", "example": "Cozy Studio" },
+                  "description": { "type": "string", "example": "Clean studio in quiet area" },
+                  "rent": { "type": "number", "example": 1200 },
+                  "location": { "type": "string", "example": "Boston" },
+                  "bedrooms": { "type": "integer", "example": 1 },
+                  "bathrooms": { "type": "number", "example": 1 },
+                  "area": { "type": "number", "example": 450 },
+                  "amenities": { "type": "array", "items": { "type": "string" }, "example": ["Wifi", "Gym"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Listing created successfully" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+    "/api/bookings": {
+      "get": {
+        "summary": "Retrieve bookings list",
+        "tags": ["Bookings"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Bookings list retrieved successfully" }
+        }
+      },
+      "post": {
+        "summary": "Initiate property booking request",
+        "tags": ["Bookings"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["propertyId", "bookingDate"],
+                "properties": {
+                  "propertyId": { "type": "string", "example": "6a29eb817fcd42025e40552b" },
+                  "bookingDate": { "type": "string", "format": "date-time", "example": "2026-07-01T10:00:00Z" },
+                  "checkIn": { "type": "string", "format": "date-time", "example": "2026-07-01T10:00:00Z" },
+                  "checkOut": { "type": "string", "format": "date-time", "example": "2026-07-08T10:00:00Z" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Booking request successfully generated" }
+        }
+      }
+    },
+    "/api/payments/create": {
+      "post": {
+        "summary": "Create a pending payment session",
+        "tags": ["Payments"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["bookingId", "amount"],
+                "properties": {
+                  "bookingId": { "type": "string", "example": "6a29eb817fcd42025e40552b" },
+                  "amount": { "type": "number", "example": 1500 },
+                  "paymentMethod": { "type": "string", "enum": ["card", "paypal", "upi", "net_banking"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Payment session successfully initiated" }
+        }
+      }
+    },
+    "/api/payments/verify": {
+      "post": {
+        "summary": "Verify payment transaction status",
+        "tags": ["Payments"],
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["paymentId"],
+                "properties": {
+                  "paymentId": { "type": "string", "example": "6a29eb817fcd42025e40552e" },
+                  "status": { "type": "string", "enum": ["completed", "failed"] },
+                  "success": { "type": "boolean" },
+                  "transactionId": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Payment status updated" }
+        }
+      }
+    },
+    "/api/chats/conversations": {
+      "get": {
+        "summary": "Get unique conversation feeds list",
+        "tags": ["Chats"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Conversations list retrieved" }
+        }
+      }
+    },
+    "/api/chats/unread/count": {
+      "get": {
+        "summary": "Get total and breakdown counts of unread messages",
+        "tags": ["Chats"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Counts retrieved" }
+        }
+      }
+    },
+    "/api/admin/dashboard": {
+      "get": {
+        "summary": "Retrieve global stats and activity logs",
+        "tags": ["Admin Portal"],
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Dashboard stats retrieved" }
+        }
+      }
+    }
+  }
+}

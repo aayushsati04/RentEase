@@ -1,180 +1,71 @@
-const Booking = require('../models/Booking');
-const Property = require('../models/Property');
+const bookingService = require('../services/bookingService');
+const asyncHandler = require('../utils/asyncHandler');
+const ApiResponse = require('../utils/ApiResponse');
 
 // @desc    Create a booking request
 // @route   POST /api/bookings
 // @access  Private (Tenant only)
-exports.createBooking = async (req, res, next) => {
-  try {
-    const { propertyId, bookingDate } = req.body;
+exports.createBooking = asyncHandler(async (req, res, next) => {
+  const { propertyId, bookingDate, checkIn, checkOut } = req.body;
+  const booking = await bookingService.createBooking(propertyId, bookingDate, checkIn, checkOut, req.user.id);
 
-    const property = await Property.findById(propertyId);
-
-    if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
-    }
-
-    if (property.status === 'booked') {
-      return res.status(400).json({ success: false, message: 'Property is already booked' });
-    }
-
-    const booking = await Booking.create({
-      propertyId,
-      tenantId: req.user.id,
-      bookingDate
-    });
-
-    res.status(201).json({
-      success: true,
-      data: booking
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(201).json({
+    success: true,
+    message: 'Booking request created successfully',
+    data: booking
+  });
+});
 
 // @desc    Get all bookings
 // @route   GET /api/bookings
 // @access  Private
-exports.getBookings = async (req, res, next) => {
-  try {
-    let bookings;
+exports.getBookings = asyncHandler(async (req, res, next) => {
+  const bookings = await bookingService.getBookings(req.user);
 
-    if (req.user.role === 'tenant') {
-      // Tenants see their own booking requests
-      bookings = await Booking.find({ tenantId: req.user.id })
-        .populate('propertyId')
-        .populate('tenantId', 'name email');
-    } else if (req.user.role === 'landlord') {
-      // Landlords see requests for their properties
-      const properties = await Property.find({ ownerId: req.user.id });
-      const propertyIds = properties.map(p => p._id);
-
-      bookings = await Booking.find({ propertyId: { $in: propertyIds } })
-        .populate('propertyId')
-        .populate('tenantId', 'name email phone');
-    } else {
-      // Admins see everything
-      bookings = await Booking.find()
-        .populate('propertyId')
-        .populate('tenantId', 'name email');
-    }
-
-    res.json({
-      success: true,
-      count: bookings.length,
-      data: bookings
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'Bookings retrieved successfully',
+    count: bookings.length,
+    data: bookings
+  });
+});
 
 // @desc    Get single booking details
 // @route   GET /api/bookings/:id
 // @access  Private
-exports.getBooking = async (req, res, next) => {
-  try {
-    const booking = await Booking.findById(req.params.id)
-      .populate('propertyId')
-      .populate('tenantId', 'name email phone');
+exports.getBooking = asyncHandler(async (req, res, next) => {
+  const booking = await bookingService.getBooking(req.params.id, req.user);
 
-    if (!booking) {
-      return res.status(404).json({ success: false, message: 'Booking not found' });
-    }
-
-    // Auth check: Admin, Tenant booking owner, or Property owner landlord
-    const isTenantOwner = booking.tenantId._id.toString() === req.user.id;
-    const property = await Property.findById(booking.propertyId._id);
-    const isPropertyOwner = property && property.ownerId.toString() === req.user.id;
-
-    if (!isTenantOwner && !isPropertyOwner && req.user.role !== 'admin') {
-      return res.status(401).json({ success: false, message: 'Not authorized to view this booking' });
-    }
-
-    res.json({
-      success: true,
-      data: booking
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'Booking details retrieved successfully',
+    data: booking
+  });
+});
 
 // @desc    Update booking status (Approve / Reject)
 // @route   PUT /api/bookings/:id
 // @access  Private (Landlord or Admin)
-exports.updateBookingStatus = async (req, res, next) => {
-  try {
-    const { status } = req.body; // 'approved' or 'rejected'
+exports.updateBookingStatus = asyncHandler(async (req, res, next) => {
+  const { status } = req.body;
+  const booking = await bookingService.updateBookingStatus(req.params.id, status, req.user);
 
-    if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status update' });
-    }
-
-    let booking = await Booking.findById(req.params.id);
-
-    if (!booking) {
-      return res.status(404).json({ success: false, message: 'Booking not found' });
-    }
-
-    // Verify user owns the property being booked
-    const property = await Property.findById(booking.propertyId);
-    if (!property || (property.ownerId.toString() !== req.user.id && req.user.role !== 'admin')) {
-      return res.status(401).json({ success: false, message: 'Not authorized to edit booking status' });
-    }
-
-    booking.status = status;
-    await booking.save();
-
-    // If approved, mark property status as booked
-    if (status === 'approved') {
-      property.status = 'booked';
-      await property.save();
-    }
-
-    res.json({
-      success: true,
-      data: booking
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: `Booking status updated to ${status} successfully`,
+    data: booking
+  });
+});
 
 // @desc    Cancel/delete booking request
 // @route   DELETE /api/bookings/:id
 // @access  Private
-exports.deleteBooking = async (req, res, next) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
+exports.deleteBooking = asyncHandler(async (req, res, next) => {
+  await bookingService.deleteBooking(req.params.id, req.user);
 
-    if (!booking) {
-      return res.status(404).json({ success: false, message: 'Booking not found' });
-    }
-
-    // Check authority: Tenant owner or Landlord property owner
-    const property = await Property.findById(booking.propertyId);
-    const isTenantOwner = booking.tenantId.toString() === req.user.id;
-    const isPropertyOwner = property && property.ownerId.toString() === req.user.id;
-
-    if (!isTenantOwner && !isPropertyOwner && req.user.role !== 'admin') {
-      return res.status(401).json({ success: false, message: 'Not authorized to cancel this booking' });
-    }
-
-    // If booking was approved, make property available again upon deletion
-    if (booking.status === 'approved' && property) {
-      property.status = 'available';
-      await property.save();
-    }
-
-    await booking.deleteOne();
-
-    res.json({
-      success: true,
-      data: {}
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'Booking request cancelled and deleted successfully',
+    data: {}
+  });
+});

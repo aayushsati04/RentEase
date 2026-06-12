@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 const navLinks = [
   { label: 'Properties', href: '/properties' },
   { label: 'How It Works', href: '/#how-it-works' },
-  { label: 'About', href: '/#about' },
+  { label: 'About', href: '/about' },
 ];
 
 export default function Navbar() {
@@ -78,37 +78,43 @@ export default function Navbar() {
                 to={link.href}
                 className={`relative px-4 py-2 text-sm font-medium transition-colors duration-200 rounded-lg group ${
                   location.pathname === link.href
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'text-primary-700 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <span className="relative z-10">{link.label}</span>
                 {location.pathname === link.href && (
                   <motion.span
                     layoutId="nav-pill"
-                    className="absolute inset-0 bg-white/8 rounded-lg"
+                    className="absolute inset-0 bg-slate-800 rounded-lg"
                   />
                 )}
-                <span className="absolute inset-0 bg-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                <span className="absolute inset-0 bg-slate-800/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" />
               </Link>
             ))}
             {user && (
               <>
                 <Link
                   to="/dashboard"
-                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                  className={`px-4 py-2 text-sm font-medium transition-colors rounded-lg ${
+                    location.pathname === '/dashboard' ? 'text-primary-700 font-semibold bg-slate-800' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   to="/bookings"
-                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                  className={`px-4 py-2 text-sm font-medium transition-colors rounded-lg ${
+                    location.pathname === '/bookings' ? 'text-primary-700 font-semibold bg-slate-800' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
                 >
                   Bookings
                 </Link>
                 <Link
                   to="/chat"
-                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                  className={`px-4 py-2 text-sm font-medium transition-colors rounded-lg ${
+                    location.pathname === '/chat' ? 'text-primary-700 font-semibold bg-slate-800' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  }`}
                 >
                   Messages
                 </Link>
@@ -123,7 +129,7 @@ export default function Navbar() {
               <div className="relative" ref={dropRef}>
                 <button
                   onClick={() => setDropOpen((p) => !p)}
-                  className="flex items-center gap-2.5 pl-2 pr-3 py-2 glass rounded-xl hover:bg-white/8 transition-all"
+                  className="flex items-center gap-2.5 pl-2 pr-3 py-2 glass rounded-xl hover:bg-slate-800 transition-all"
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-violet-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">
                     {initials}
@@ -163,7 +169,7 @@ export default function Navbar() {
                           key={item.label}
                           to={item.href}
                           onClick={() => setDropOpen(false)}
-                          className="block px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors"
+                          className="block px-4 py-2.5 text-sm text-slate-300 hover:text-primary-700 hover:bg-slate-800 transition-colors"
                         >
                           {item.label}
                         </Link>

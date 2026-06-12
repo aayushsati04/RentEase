@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
 const STEPS = [
@@ -12,6 +14,7 @@ const STEPS = [
 
 export default function AddPropertyPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
 
   // Form State
@@ -56,12 +59,44 @@ export default function AddPropertyPage() {
     setCurrentStep(prev => prev - 1);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    toast.success('Listing created successfully! Awaiting validation.');
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 1000);
+    if (!user) {
+      toast.error('Authentication required to create listings');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .insert({
+          owner_id: user.id,
+          title,
+          description,
+          rent: Number(price),
+          location: `${address}, ${city}`,
+          bedrooms: Number(bedrooms),
+          bathrooms: Number(bathrooms),
+          type,
+          area: Number(area),
+          amenities,
+          images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
+          status: 'available',
+          is_verified: false // Admin must approve
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Listing created successfully! Awaiting validation.');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
+    } catch (err) {
+      console.error('Error creating listing:', err);
+      toast.error(err.message || 'Failed to submit listing');
+    }
   };
 
   return (

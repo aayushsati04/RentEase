@@ -1,0 +1,11 @@
+{
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/payments/create", "destination": "/api/payments/create.js" },
+    { "source": "/api/payments/verify", "destination": "/api/payments/verify.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

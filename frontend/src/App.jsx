@@ -20,6 +20,7 @@ import AddPropertyPage from './pages/AddPropertyPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import ChatPage from './pages/ChatPage';
 import CheckoutPage from './pages/CheckoutPage';
+import AboutPage from './pages/AboutPage';
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
             <Routes>
               {/* Public Discovery Routes */}
               <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/properties" element={<PropertiesPage />} />

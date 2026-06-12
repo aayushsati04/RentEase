@@ -35,6 +35,18 @@ const propertySchema = new mongoose.Schema({
   images: [{
     type: String
   }],
+  type: {
+    type: String,
+    trim: true,
+    default: 'Apartment'
+  },
+  area: {
+    type: Number,
+    default: 0
+  },
+  amenities: [{
+    type: String
+  }],
   status: {
     type: String,
     enum: ['available', 'booked'],
@@ -43,9 +55,23 @@ const propertySchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false
+  },
+  averageRating: {
+    type: Number,
+    default: 0
+  },
+  totalReviews: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true
 });
+
+// Indexes for query optimization
+propertySchema.index({ location: 1 });
+propertySchema.index({ rent: 1 });
+propertySchema.index({ ownerId: 1 });
+propertySchema.index({ averageRating: -1 });
 
 module.exports = mongoose.model('Property', propertySchema);

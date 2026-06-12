@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { featuredProperties } from '../data/sampleData';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
 export default function PropertyDetailsPage() {
@@ -10,28 +11,75 @@ export default function PropertyDetailsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Find property by ID, fallback to first property if not found (for testing)
-  const property = useMemo(() => {
-    const found = featuredProperties.find(p => p.id === parseInt(id));
-    return found || featuredProperties[0];
-  }, [id]);
-
-  const [activeImg, setActiveImg] = useState(property.image);
+  const [property, setProperty] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeImg, setActiveImg] = useState('');
   const [moveInDate, setMoveInDate] = useState('');
   const [moveOutDate, setMoveOutDate] = useState('');
   const [guests, setGuests] = useState(1);
 
+  useEffect(() => {
+    const fetchProperty = async () => {
+      try {
+        setLoading(true);
+        // Supabase select with nested owner profile details
+        const { data, error } = await supabase
+          .from('properties')
+          .select('*, owner:owner_id(id, name, email, phone)')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+
+        const mapped = {
+          ...data,
+          price: Number(data.rent),
+          verified: data.is_verified,
+          rating: Number(data.average_rating) || 4.5,
+          reviews: data.total_reviews || 0,
+          image: data.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+          tag: data.type === 'Villa' ? 'Popular' : data.type === 'Apartment' ? 'Premium' : 'Trending',
+          tagColor: data.type === 'Villa' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
+          hostName: data.owner?.name || 'Rohan Malhotra'
+        };
+        setProperty(mapped);
+        setActiveImg(mapped.image);
+      } catch (err) {
+        console.error('Error fetching property details:', err);
+        const found = featuredProperties.find(p => p.id === parseInt(id)) || featuredProperties[0];
+        const fallback = {
+          ...found,
+          price: found.price,
+          verified: found.verified,
+          rating: found.rating,
+          reviews: found.reviews,
+          image: found.image,
+          hostName: 'Rohan Malhotra'
+        };
+        setProperty(fallback);
+        setActiveImg(fallback.image);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProperty();
+  }, [id]);
+
   // Gallery images (additional mock images for premium feel)
-  const gallery = [
-    property.image,
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80',
-    'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&q=80',
-    'https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=800&q=80',
-  ];
+  const gallery = useMemo(() => {
+    if (!property) return [];
+    return [
+      property.image,
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80',
+      'https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&q=80',
+      'https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=800&q=80',
+    ];
+  }, [property]);
 
   // Dynamic booking calculations
   const bookingSummary = useMemo(() => {
-    if (!moveInDate || !moveOutDate) return null;
+    if (!property || !moveInDate || !moveOutDate) return null;
     const start = new Date(moveInDate);
     const end = new Date(moveOutDate);
     const diffTime = Math.abs(end - start);
@@ -51,7 +99,7 @@ export default function PropertyDetailsPage() {
       serviceFee,
       total,
     };
-  }, [moveInDate, moveOutDate, property.price]);
+  }, [moveInDate, moveOutDate, property]);
 
   const handleBookNow = (e) => {
     e.preventDefault();
@@ -73,6 +121,28 @@ export default function PropertyDetailsPage() {
     toast.success('Redirecting to secure checkout...');
     navigate(`/payments/checkout/${property.id}?months=${bookingSummary.months}&total=${bookingSummary.total}&in=${moveInDate}&out=${moveOutDate}`);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-400 text-sm">Loading property details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!property) {
+    return (
+      <div className="min-h-screen bg-slate-950 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold text-white">Property Not Found</h2>
+          <Link to="/properties" className="btn-primary inline-block">Back to Listings</Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-16">
@@ -173,7 +243,7 @@ export default function PropertyDetailsPage() {
             <div className="space-y-3">
               <h3 className="text-white font-bold text-lg">About This Space</h3>
               <p className="text-slate-400 text-sm leading-relaxed">
-                Experience luxury living in this beautifully designed property. Boasting stunning architecture, high-end finishing, and panoramic views, this home offers everything you need for a premium lifestyle. Perfect for families and professionals alike, located in one of the most vibrant areas with easy access to shopping hubs, IT parks, and dining options. Enjoy state-of-the-art facilities, double-height ceilings, and excellent privacy.
+                {property.description || `Experience luxury living in this beautifully designed property. Boasting stunning architecture, high-end finishing, and panoramic views, this home offers everything you need for a premium lifestyle. Perfect for families and professionals alike, located in one of the most vibrant areas with easy access to shopping hubs, IT parks, and dining options. Enjoy state-of-the-art facilities, double-height ceilings, and excellent privacy.`}
               </p>
             </div>
 
@@ -215,8 +285,8 @@ export default function PropertyDetailsPage() {
               </div>
               <div className="flex-1 text-center sm:text-left space-y-1">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h4 className="text-white font-bold text-base">Rohan Malhotra</h4>
-                  <span className="text-[10px] px-2 py-0.5 bg-primary-600/35 text-primary-300 font-semibold rounded-full uppercase tracking-wider">
+                  <h4 className="text-white font-bold text-base">{property.hostName}</h4>
+                  <span className="text-[10px] px-2 py-0.5 bg-primary-600/35 text-primary-300 font-semibold rounded-full uppercase tracking-wider mt-1.5 capitalize">
                     Superhost
                   </span>
                 </div>
@@ -229,7 +299,7 @@ export default function PropertyDetailsPage() {
                 to="/chat" 
                 className="px-5 py-2.5 glass text-slate-300 hover:text-white border border-white/8 hover:bg-white/5 rounded-xl text-sm font-semibold transition-all shrink-0"
               >
-                Message Rohan
+                Message {property.hostName.split(' ')[0]}
               </Link>
             </div>
 

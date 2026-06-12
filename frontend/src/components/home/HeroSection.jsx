@@ -183,8 +183,8 @@ export default function HeroSection() {
           {/* Search Button */}
           <button
             type="submit"
-            className="px-8 py-3 bg-gradient-to-r from-primary-600 to-violet-600 hover:from-primary-500 hover:to-violet-500
-                       text-white font-bold rounded-xl transition-all duration-200 hover:shadow-glow
+            className="px-8 py-3 bg-primary-600 hover:bg-primary-700
+                       text-white font-bold rounded-xl transition-all duration-200 hover:shadow-md
                        flex items-center gap-2 whitespace-nowrap"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

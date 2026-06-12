@@ -1,113 +1,178 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
-
-const CONTACTS = [
-  {
-    id: 1,
-    name: 'Rohan Malhotra',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&q=80',
-    property: 'Luxury Penthouse Suite',
-    online: true,
-    lastMsg: 'Let me know your preferred move-in schedule.',
-    unread: 1,
-    history: [
-      { sender: 'them', text: 'Hello! Thanks for showing interest in the Luxury Penthouse.', time: '10:04 AM' },
-      { sender: 'me', text: 'Hi Rohan! Is the parking space suitable for SUVs?', time: '10:15 AM' },
-      { sender: 'them', text: 'Yes, we have 2 designated basement slots suitable for large SUVs.', time: '10:17 AM' },
-      { sender: 'them', text: 'Let me know your preferred move-in schedule.', time: '10:18 AM' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Rahul Mehta',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80',
-    property: 'Modern Sea-View Villa',
-    online: true,
-    lastMsg: "Sure, let's schedule a site visit tomorrow.",
-    unread: 0,
-    history: [
-      { sender: 'me', text: 'Hi Rahul, is the sea-view villa available from next month?', time: 'Yesterday' },
-      { sender: 'them', text: "Sure, let's schedule a site visit tomorrow.", time: 'Yesterday' }
-    ]
-  },
-  {
-    id: 3,
-    name: 'Sumit Sharma',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&q=80',
-    property: 'Furnished PG with Meals',
-    online: false,
-    lastMsg: 'Your booking has been completed.',
-    unread: 0,
-    history: [
-      { sender: 'them', text: 'Your booking has been completed.', time: 'June 5' }
-    ]
-  }
-];
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const [contacts, setContacts] = useState(CONTACTS);
-  const [activeContactId, setActiveContactId] = useState(1);
+  const [profiles, setProfiles] = useState([]);
+  const [activeContactId, setActiveContactId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const activeContact = contacts.find(c => c.id === activeContactId);
+  // Fallback contacts list if no other registered users are found in database
+  const fallbackContacts = useMemo(() => [
+    {
+      id: 'rohan-malhotra-mock-uuid',
+      name: 'Rohan Malhotra',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&q=80',
+      property: 'Luxury Penthouse Suite',
+      online: true,
+      lastMsg: 'Let me know your preferred move-in schedule.'
+    },
+    {
+      id: 'rahul-mehta-mock-uuid',
+      name: 'Rahul Mehta',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80',
+      property: 'Modern Sea-View Villa',
+      online: true,
+      lastMsg: "Sure, let's schedule a site visit tomorrow."
+    }
+  ], []);
+
+  // 1. Fetch other profiles to populate the sidebar contacts list
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .neq('id', user.id);
+
+        if (error) throw error;
+        
+        const contactsList = (data || []).map(p => ({
+          id: p.id,
+          name: p.name,
+          avatar: `https://images.unsplash.com/photo-${p.role === 'landlord' ? '1507003211169-0a1dd7228f2d' : '1494790108377-be9c29b29330'}?w=100&q=80`,
+          property: p.role === 'landlord' ? 'Landlord / Partner' : 'Renter / Tenant',
+          online: Math.random() > 0.4,
+          lastMsg: 'Select thread to chat'
+        }));
+
+        if (contactsList.length > 0) {
+          setProfiles(contactsList);
+          setActiveContactId(contactsList[0].id);
+        } else {
+          setProfiles(fallbackContacts);
+          setActiveContactId(fallbackContacts[0].id);
+        }
+      } catch (err) {
+        console.error('Error loading profiles:', err);
+        setProfiles(fallbackContacts);
+        setActiveContactId(fallbackContacts[0].id);
+      }
+    };
+
+    fetchProfiles();
+  }, [user, fallbackContacts]);
+
+  // 2. Fetch messages for selected contact thread
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        if (!user || !activeContactId) return;
+
+        const { data, error } = await supabase
+          .from('chats')
+          .select('*')
+          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeContactId}),and(sender_id.eq.${activeContactId},receiver_id.eq.${user.id})`)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setMessages(data || []);
+      } catch (err) {
+        console.error('Error fetching messages:', err);
+      }
+    };
+
+    fetchMessages();
+  }, [user, activeContactId]);
+
+  // 3. Subscribe to Realtime database inserts for instant chat synchronization
+  useEffect(() => {
+    if (!user || !activeContactId) return;
+
+    const channel = supabase
+      .channel(`chat-room-${activeContactId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chats'
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          if (
+            (newMsg.sender_id === user.id && newMsg.receiver_id === activeContactId) ||
+            (newMsg.sender_id === activeContactId && newMsg.receiver_id === user.id)
+          ) {
+            setMessages(prev => [...prev, newMsg]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, activeContactId]);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeContact?.history, isTyping]);
+  }, [messages, isTyping]);
 
-  const handleSendMessage = (e) => {
+  const activeContact = profiles.find(c => c.id === activeContactId);
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !user || !activeContactId) return;
 
-    const newMsg = {
-      sender: 'me',
-      text: inputText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    // Update active contact message history
-    const updated = contacts.map(c => {
-      if (c.id === activeContactId) {
-        return {
-          ...c,
-          lastMsg: inputText,
-          history: [...c.history, newMsg]
-        };
-      }
-      return c;
-    });
-
-    setContacts(updated);
+    const messageText = inputText;
     setInputText('');
 
-    // Simulate dynamic auto-reply typing effect
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const reply = {
-        sender: 'them',
-        text: `Thanks for the update! I've received your message. I am currently out of office, but I will get back to you shortly regarding this.`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      const addedReply = updated.map(c => {
-        if (c.id === activeContactId) {
-          return {
-            ...c,
-            lastMsg: reply.text,
-            history: [...c.history, reply]
-          };
-        }
-        return c;
-      });
-      setContacts(addedReply);
-    }, 1800);
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .insert({
+          sender_id: user.id,
+          receiver_id: activeContactId,
+          message: messageText
+        });
+
+      if (error) throw error;
+
+      // Local append if realtime is slower or for mock users
+      if (activeContactId.includes('mock')) {
+        setMessages(prev => [...prev, {
+          sender_id: user.id,
+          receiver_id: activeContactId,
+          message: messageText,
+          created_at: new Date().toISOString()
+        }]);
+
+        // Simulate auto-reply typing effect for mock landlords
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          setMessages(prev => [...prev, {
+            sender_id: activeContactId,
+            receiver_id: user.id,
+            message: `Hi! Thanks for reaching out about the listing. I have received your message. I am currently away, but I will get back to you shortly.`,
+            created_at: new Date().toISOString()
+          }]);
+        }, 1500);
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      toast.error('Failed to send message');
+    }
   };
 
   return (
@@ -134,15 +199,13 @@ export default function ChatPage() {
 
             {/* Contacts list */}
             <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
-              {contacts.map((c) => {
+              {profiles.map((c) => {
                 const active = c.id === activeContactId;
                 return (
                   <button
                     key={c.id}
                     onClick={() => {
                       setActiveContactId(c.id);
-                      // Clear unread badge
-                      setContacts(contacts.map(item => item.id === c.id ? { ...item, unread: 0 } : item));
                     }}
                     className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-left ${
                       active ? 'bg-primary-600/20 border border-primary-500/20' : 'hover:bg-white/5 border border-transparent'
@@ -157,9 +220,6 @@ export default function ChatPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-baseline">
                         <h4 className="text-white font-bold text-sm truncate">{c.name}</h4>
-                        {c.unread > 0 && (
-                          <span className="w-2.5 h-2.5 bg-primary-500 rounded-full shrink-0 shadow-glow-sm" />
-                        )}
                       </div>
                       <p className="text-slate-500 text-xs truncate mt-0.5">{c.property}</p>
                       <p className="text-slate-400 text-xs truncate mt-1 leading-snug">{c.lastMsg}</p>
@@ -191,8 +251,9 @@ export default function ChatPage() {
 
                 {/* Messages stream */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
-                  {activeContact.history.map((msg, idx) => {
-                    const isMe = msg.sender === 'me';
+                  {messages.map((msg, idx) => {
+                    const isMe = msg.sender_id === user.id;
+                    const timeFormatted = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     return (
                       <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[70%] rounded-2xl p-4 text-sm leading-relaxed border ${
@@ -200,8 +261,8 @@ export default function ChatPage() {
                             ? 'bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-primary-500/25 shadow-glow-sm rounded-tr-none' 
                             : 'bg-white/5 text-slate-300 border-white/8 rounded-tl-none'
                         }`}>
-                          <p>{msg.text}</p>
-                          <span className="text-[9px] text-slate-400/80 block text-right mt-1.5 font-medium">{msg.time}</span>
+                          <p>{msg.message}</p>
+                          <span className="text-[9px] text-slate-400/80 block text-right mt-1.5 font-medium">{timeFormatted}</span>
                         </div>
                       </div>
                     );

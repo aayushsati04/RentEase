@@ -1,76 +1,49 @@
-const Review = require('../models/Review');
-const Property = require('../models/Property');
+const reviewService = require('../services/reviewService');
+const asyncHandler = require('../utils/asyncHandler');
+const ApiResponse = require('../utils/ApiResponse');
 
 // @desc    Add review for a property listing
 // @route   POST /api/reviews
 // @access  Private (Tenant only)
-exports.addReview = async (req, res, next) => {
-  try {
-    const { propertyId, rating, comment } = req.body;
+exports.addReview = asyncHandler(async (req, res, next) => {
+  const { propertyId, rating, comment } = req.body;
+  const review = await reviewService.addReview(
+    propertyId,
+    rating,
+    comment,
+    req.user.id
+  );
 
-    const property = await Property.findById(propertyId);
-
-    if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
-    }
-
-    const review = await Review.create({
-      propertyId,
-      userId: req.user.id,
-      rating,
-      comment
-    });
-
-    res.status(201).json({
-      success: true,
-      data: review
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(201).json(
+    new ApiResponse(201, 'Review created successfully', review)
+  );
+});
 
 // @desc    Get reviews for specific property
 // @route   GET /api/reviews/:propertyId
 // @access  Public
-exports.getPropertyReviews = async (req, res, next) => {
-  try {
-    const reviews = await Review.find({ propertyId: req.params.propertyId })
-      .populate('userId', 'name');
+exports.getPropertyReviews = asyncHandler(async (req, res, next) => {
+  const reviews = await reviewService.getPropertyReviews(req.params.propertyId);
 
-    res.json({
-      success: true,
-      count: reviews.length,
-      data: reviews
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    message: 'Reviews retrieved successfully',
+    count: reviews.length,
+    data: reviews
+  });
+});
 
 // @desc    Delete a property review
 // @route   DELETE /api/reviews/:id
 // @access  Private (Author or Admin only)
-exports.deleteReview = async (req, res, next) => {
-  try {
-    const review = await Review.findById(req.params.id);
+exports.deleteReview = asyncHandler(async (req, res, next) => {
+  await reviewService.deleteReview(
+    req.params.id,
+    req.user.id,
+    req.user.role
+  );
 
-    if (!review) {
-      return res.status(404).json({ success: false, message: 'Review not found' });
-    }
-
-    // Auth check: Owner of review or administrator
-    if (review.userId.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(401).json({ success: false, message: 'Not authorized to delete this review' });
-    }
-
-    await review.deleteOne();
-
-    res.json({
-      success: true,
-      data: {}
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json(
+    new ApiResponse(200, 'Review deleted successfully', {})
+  );
+});

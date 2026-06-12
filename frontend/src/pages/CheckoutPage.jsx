@@ -1,13 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { featuredProperties } from '../data/sampleData';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import axios from 'axios';
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 export default function CheckoutPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const months = parseInt(searchParams.get('months')) || 1;
   const total = parseInt(searchParams.get('total')) || 0;
@@ -26,6 +44,12 @@ export default function CheckoutPage() {
   const [isCVVFocused, setIsCVVFocused] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // DB and Razorpay states
+  const [dbProperty, setDbProperty] = useState(null);
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [txnId, setTxnId] = useState('');
 
   // Card Number Formatter (4-4-4-4)
   const handleCardNumberChange = (e) => {
@@ -56,21 +80,206 @@ export default function CheckoutPage() {
     }
   };
 
-  const handlePay = (e) => {
+  useEffect(() => {
+    let active = true;
+    const fetchPropertyAndCreateBooking = async () => {
+      try {
+        setLoading(true);
+        if (!user) {
+          toast.error('Authentication required for checkout');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch properties from database by ID
+        const { data: matched, error: pError } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (pError) throw pError;
+        
+        if (!active) return;
+        setDbProperty(matched);
+        
+        // Create booking in the database
+        const checkInDate = moveIn ? new Date(moveIn) : new Date();
+        const checkOutDate = moveOut ? new Date(moveOut) : new Date(checkInDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        const { data: newBooking, error: bookingErr } = await supabase
+          .from('bookings')
+          .insert({
+            property_id: matched.id,
+            tenant_id: user.id,
+            check_in: checkInDate.toISOString(),
+            check_out: checkOutDate.toISOString(),
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (bookingErr) throw bookingErr;
+
+        if (active) {
+          setBooking({
+            ...newBooking,
+            _id: newBooking.id // Compatibility mapping
+          });
+        }
+      } catch (err) {
+        console.error('Checkout initialization error:', err);
+        // Fallback simulate booking for offline/test environments
+        if (active) {
+          setBooking({
+            id: 'mock_bk_' + Math.random().toString(36).substring(2, 9),
+            _id: 'mock_bk_' + Math.random().toString(36).substring(2, 9)
+          });
+          toast.error('Using test/sandbox booking fallback.');
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchPropertyAndCreateBooking();
+
+    return () => {
+      active = false;
+    };
+  }, [id, user, moveIn, moveOut]);
+
+  const handlePay = async (e) => {
     e.preventDefault();
-    if (cardNumber.length < 19 || cardHolder.trim() === '' || cardExpiry.length < 5 || cardCVV.length < 3) {
-      toast.error('Please fill in valid payment credentials');
+    if (!booking) {
+      toast.error('Booking not initialized yet');
       return;
     }
     setIsSubmitting(true);
 
-    // Simulate Payment processing
-    setTimeout(() => {
+    try {
+      // 1. Create Payment Session / Order on backend serverless function
+      const sessionRes = await axios.post('/api/payments/create', {
+        bookingId: booking._id,
+        amount: total,
+        paymentMethod: 'card'
+      });
+
+      const paymentSession = sessionRes.data.data;
+      if (!paymentSession) {
+        throw new Error('No payment session returned from backend');
+      }
+
+      // 2. Demo simulation fallback if dummy key is used
+      if (paymentSession.razorpayKeyId === 'rzp_test_dummykeyid123') {
+        const loadingToastId = toast.loading('Demo Mode: Simulating secure payment...');
+        setTimeout(async () => {
+          try {
+            const mockPaymentId = `pay_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
+            const mockSignature = `sig_${Math.random().toString(36).substring(2, 16).toUpperCase()}`;
+
+            const verifyRes = await axios.post('/api/payments/verify', {
+              paymentId: paymentSession._id || paymentSession.id,
+              razorpay_payment_id: mockPaymentId,
+              razorpay_order_id: paymentSession.razorpayOrderId,
+              razorpay_signature: mockSignature
+            });
+
+            if (verifyRes.data.success) {
+              setTxnId(mockPaymentId);
+              setIsSuccess(true);
+              toast.success('Payment Verified & Booking Confirmed!', { id: loadingToastId });
+            } else {
+              toast.error('Payment verification failed.', { id: loadingToastId });
+            }
+          } catch (err) {
+            console.error('Mock verification failed:', err);
+            toast.error(err.response?.data?.message || 'Payment verification failed', { id: loadingToastId });
+          } finally {
+            setIsSubmitting(false);
+          }
+        }, 2000);
+        return;
+      }
+
+      // 3. Load Razorpay script (only needed for real checkout)
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error('Razorpay SDK failed to load. Are you online?');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Configure and Open Razorpay Checkout Modal
+      const options = {
+        key: paymentSession.razorpayKeyId,
+        amount: Math.round(total * 100),
+        currency: 'INR',
+        name: 'RentEase Payments',
+        description: `Booking Rent Payment - ${property.title}`,
+        order_id: paymentSession.razorpayOrderId,
+        handler: async function (response) {
+          try {
+            setIsSubmitting(true);
+            // Verify signature on serverless backend
+            const verifyRes = await axios.post('/api/payments/verify', {
+              paymentId: paymentSession._id || paymentSession.id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            if (verifyRes.data.success) {
+              setTxnId(response.razorpay_payment_id);
+              setIsSuccess(true);
+              toast.success('Payment Verified & Booking Confirmed!');
+            } else {
+              toast.error('Payment verification failed.');
+            }
+          } catch (err) {
+            console.error('Razorpay verification callback failed:', err);
+            toast.error(err.response?.data?.message || 'Payment verification failed');
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.phone || ''
+        },
+        theme: {
+          color: '#4f62f1'
+        },
+        modal: {
+          ondismiss: function () {
+            setIsSubmitting(false);
+            toast.error('Payment cancelled');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error('Razorpay initialization flow failed:', err);
+      toast.error(err.response?.data?.message || 'Failed to start payment process');
       setIsSubmitting(false);
-      setIsSuccess(true);
-      toast.success('Booking Confirmed & RentPaid!');
-    }, 2500);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-400 text-sm">Initializing your secure booking...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-16 flex items-center justify-center">
@@ -348,7 +557,7 @@ export default function CheckoutPage() {
               <div className="bg-white/3 rounded-2xl p-4 text-left space-y-3 text-xs">
                 <div className="flex justify-between text-slate-400">
                   <span>Transaction ID:</span>
-                  <span className="text-white font-mono">TXN_RE_982741982749</span>
+                  <span className="text-white font-mono">{txnId || 'TXN_RE_982741982749'}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Property Name:</span>

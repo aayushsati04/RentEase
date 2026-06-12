@@ -1,14 +1,137 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { featuredProperties } from '../data/sampleData';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
 export default function UserDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
+  const [properties, setProperties] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [stats, setStats] = useState([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        if (!user) return;
+
+        if (user.role === 'landlord' || user.role === 'owner') {
+          // Fetch landlord listings
+          const { data: propData, error: propErr } = await supabase
+            .from('properties')
+            .select('*')
+            .eq('owner_id', user.id);
+          
+          if (propErr) throw propErr;
+
+          const propIds = (propData || []).map(p => p.id);
+          let pendingCount = 0;
+          let totalEarnings = 0;
+
+          if (propIds.length > 0) {
+            const { data: bkData, error: bkErr } = await supabase
+              .from('bookings')
+              .select('*')
+              .in('property_id', propIds);
+            
+            if (!bkErr && bkData) {
+              pendingCount = bkData.filter(b => b.status === 'pending').length;
+              
+              const bkIds = bkData.map(b => b.id);
+              if (bkIds.length > 0) {
+                const { data: payData, error: payErr } = await supabase
+                  .from('payments')
+                  .select('*')
+                  .in('booking_id', bkIds)
+                  .eq('payment_status', 'completed');
+                if (!payErr && payData) {
+                  totalEarnings = payData.reduce((sum, p) => sum + Number(p.amount), 0);
+                }
+              }
+            }
+          }
+
+          setProperties((propData || []).map(p => ({
+            ...p,
+            price: Number(p.rent),
+            image: p.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+            rating: p.average_rating || 4.5
+          })));
+
+          const formattedEarnings = totalEarnings >= 100000 
+            ? `₹${(totalEarnings / 100000).toFixed(2)}L` 
+            : `₹${(totalEarnings / 1000).toFixed(1)}k`;
+
+          setStats([
+            { label: 'Total Listings', value: propIds.length.toString(), icon: '🏢', color: 'from-blue-600/20 to-indigo-600/20' },
+            { label: 'Monthly Earnings', value: formattedEarnings, icon: '📈', color: 'from-emerald-600/20 to-teal-600/20' },
+            { label: 'Pending Bookings', value: pendingCount.toString(), icon: '⏳', color: 'from-amber-600/20 to-orange-600/20' },
+            { label: 'Average Rating', value: '4.8 ★', icon: '⭐', color: 'from-violet-600/20 to-purple-600/20' },
+          ]);
+
+        } else {
+          // Fetch tenant bookings
+          const { data: bkData, error: bkErr } = await supabase
+            .from('bookings')
+            .select('*, property:property_id(*)')
+            .eq('tenant_id', user.id);
+          
+          if (bkErr) throw bkErr;
+
+          let paidCount = 0;
+          let unpaidCount = 0;
+          let totalSpent = 0;
+
+          const bkMapped = (bkData || []).map(b => {
+            const propertyRent = Number(b.property?.rent) || 0;
+            if (b.status === 'confirmed') {
+              paidCount++;
+              totalSpent += propertyRent;
+            } else if (b.status === 'pending') {
+              unpaidCount++;
+            }
+            return {
+              id: b.id.toString(),
+              property: {
+                ...b.property,
+                title: b.property?.title || 'RentEase Property',
+                location: b.property?.location || 'India',
+                image: b.property?.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+              },
+              checkIn: b.check_in.split('T')[0],
+              checkOut: b.check_out.split('T')[0],
+              status: b.status === 'confirmed' ? 'Paid' : b.status === 'pending' ? 'Approved & Unpaid' : b.status,
+              amount: propertyRent
+            };
+          });
+
+          setBookings(bkMapped);
+
+          const formattedSpent = totalSpent >= 100000 
+            ? `₹${(totalSpent / 100000).toFixed(2)}L` 
+            : `₹${(totalSpent / 1000).toFixed(1)}k`;
+
+          setStats([
+            { label: 'Active Rentals', value: paidCount.toString(), icon: '🏠', color: 'from-blue-600/20 to-indigo-600/20' },
+            { label: 'Unpaid Bookings', value: unpaidCount.toString(), icon: '⏳', color: 'from-rose-600/20 to-pink-600/20' },
+            { label: 'Unread Chats', value: '0', icon: '💬', color: 'from-emerald-600/20 to-teal-600/20' },
+            { label: 'Rent Paid (YTD)', value: formattedSpent, icon: '💳', color: 'from-amber-600/20 to-orange-600/20' },
+          ]);
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard details:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [user]);
 
   // Guard: If not logged in, redirect (handled by ProtectedRoute, but double safety)
   if (!user) {
@@ -21,42 +144,20 @@ export default function UserDashboardPage() {
 
   const isLandlord = user.role === 'landlord' || user.role === 'owner';
 
-  // Sample data for Tenant
-  const tenantStats = [
-    { label: 'Active Rentals', value: '1', icon: '🏠', color: 'from-blue-600/20 to-indigo-600/20' },
-    { label: 'Saved Houses', value: '12', icon: '💖', color: 'from-rose-600/20 to-pink-600/20' },
-    { label: 'Unread Chats', value: '3', icon: '💬', color: 'from-emerald-600/20 to-teal-600/20' },
-    { label: 'RentPaid (YTD)', value: '₹1.2L', icon: '💳', color: 'from-amber-600/20 to-orange-600/20' },
-  ];
-
-  // Sample data for Landlord
-  const landlordStats = [
-    { label: 'Total Listings', value: '3', icon: '🏢', color: 'from-blue-600/20 to-indigo-600/20' },
-    { label: 'Monthly Earnings', value: '₹1.85L', icon: '📈', color: 'from-emerald-600/20 to-teal-600/20' },
-    { label: 'Pending Bookings', value: '2', icon: '⏳', color: 'from-amber-600/20 to-orange-600/20' },
-    { label: 'Average Rating', value: '4.8 ★', icon: '⭐', color: 'from-violet-600/20 to-purple-600/20' },
-  ];
-
-  const stats = isLandlord ? landlordStats : tenantStats;
-
-  // Mock landlord listings
-  const landlordProperties = featuredProperties.slice(0, 3);
-
-  // Mock tenant bookings
-  const tenantBookings = [
-    {
-      id: 'B_928174',
-      property: featuredProperties[0],
-      checkIn: '2026-07-01',
-      checkOut: '2027-06-30',
-      status: 'Paid',
-      amount: 85000,
-    }
-  ];
-
   const handleEditProfile = () => {
     toast.success('Profile edit settings are disabled in sandbox.');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 pt-24 pb-16 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-400 text-sm">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-16">
@@ -213,72 +314,90 @@ export default function UserDashboardPage() {
                   >
                     {/* Landlord View */}
                     {isLandlord ? (
-                      <div className="glass-card rounded-3xl overflow-hidden border border-white/8">
-                        <table className="w-full text-left border-collapse text-sm">
-                          <thead>
-                            <tr className="border-b border-white/8 bg-white/2 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                              <th className="px-6 py-4">Property</th>
-                              <th className="px-6 py-4">Rate</th>
-                              <th className="px-6 py-4">Rating</th>
-                              <th className="px-6 py-4 text-right">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {landlordProperties.map((p) => (
-                              <tr key={p.id} className="border-b border-white/4 hover:bg-white/2 transition-colors">
-                                <td className="px-6 py-4 flex items-center gap-3">
-                                  <img src={p.image} alt={p.title} className="w-12 h-12 object-cover rounded-xl border border-white/8 shrink-0" />
-                                  <div>
-                                    <div className="text-white font-bold">{p.title}</div>
-                                    <div className="text-slate-500 text-xs">{p.location}</div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="text-white font-bold">₹{p.price.toLocaleString()}</span>
-                                  <span className="text-slate-500 text-xs">/mo</span>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="text-amber-400">★ {p.rating}</span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  <button onClick={() => navigate(`/properties/${p.id}`)} className="text-xs px-3 py-1.5 bg-primary-600/20 text-primary-300 hover:text-white border border-primary-500/30 rounded-lg mr-2 transition-all">
-                                    View
-                                  </button>
-                                </td>
+                      properties.length === 0 ? (
+                        <div className="text-center py-16 bg-white/2 rounded-3xl border border-dashed border-slate-800">
+                          <p className="text-slate-400 text-sm mb-4">You haven't listed any properties yet.</p>
+                          <Link to="/properties/add" className="btn-primary text-xs py-2 px-4 inline-block font-semibold">
+                            Create a Listing
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="glass-card rounded-3xl overflow-hidden border border-white/8">
+                          <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                              <tr className="border-b border-white/8 bg-white/2 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                                <th className="px-6 py-4">Property</th>
+                                <th className="px-6 py-4">Rate</th>
+                                <th className="px-6 py-4">Rating</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {properties.map((p) => (
+                                <tr key={p.id} className="border-b border-white/4 hover:bg-white/2 transition-colors">
+                                  <td className="px-6 py-4 flex items-center gap-3">
+                                    <img src={p.image} alt={p.title} className="w-12 h-12 object-cover rounded-xl border border-white/8 shrink-0" />
+                                    <div>
+                                      <div className="text-white font-bold">{p.title}</div>
+                                      <div className="text-slate-500 text-xs">{p.location}</div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className="text-white font-bold">₹{p.price.toLocaleString()}</span>
+                                    <span className="text-slate-500 text-xs">/mo</span>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className="text-amber-400">★ {p.rating}</span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    <button onClick={() => navigate(`/properties/${p.id}`)} className="text-xs px-3 py-1.5 bg-primary-600/20 text-primary-300 hover:text-white border border-primary-500/30 rounded-lg mr-2 transition-all">
+                                      View
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
                     ) : (
                       /* Tenant View */
-                      <div className="space-y-4">
-                        {tenantBookings.map((b) => (
-                          <div key={b.id} className="glass-card rounded-3xl p-5 border border-white/8 flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div className="flex items-center gap-4 w-full sm:w-auto">
-                              <img src={b.property.image} alt={b.property.title} className="w-16 h-16 object-cover rounded-2xl border border-white/8 shrink-0" />
-                              <div>
-                                <h4 className="text-white font-bold text-sm leading-snug">{b.property.title}</h4>
-                                <p className="text-slate-400 text-xs mt-0.5">{b.property.location}</p>
-                                <div className="flex gap-2 text-xs text-slate-500 mt-1.5">
-                                  <span>In: {b.checkIn}</span>
-                                  <span>•</span>
-                                  <span>Out: {b.checkOut}</span>
+                      bookings.length === 0 ? (
+                        <div className="text-center py-16 bg-white/2 rounded-3xl border border-dashed border-slate-800">
+                          <p className="text-slate-400 text-sm mb-4">You don't have any bookings yet.</p>
+                          <Link to="/properties" className="btn-primary text-xs py-2 px-4 inline-block font-semibold">
+                            Browse Listings
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {bookings.map((b) => (
+                            <div key={b.id} className="glass-card rounded-3xl p-5 border border-white/8 flex flex-col sm:flex-row justify-between items-center gap-4">
+                              <div className="flex items-center gap-4 w-full sm:w-auto">
+                                <img src={b.property.image} alt={b.property.title} className="w-16 h-16 object-cover rounded-2xl border border-white/8 shrink-0" />
+                                <div>
+                                  <h4 className="text-white font-bold text-sm leading-snug">{b.property.title}</h4>
+                                  <p className="text-slate-400 text-xs mt-0.5">{b.property.location}</p>
+                                  <div className="flex gap-2 text-xs text-slate-500 mt-1.5">
+                                    <span>In: {b.checkIn}</span>
+                                    <span>•</span>
+                                    <span>Out: {b.checkOut}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto border-t sm:border-t-0 border-white/8 pt-3 sm:pt-0">
-                              <div>
-                                <span className="text-white font-black">₹{b.amount.toLocaleString()}</span>
-                                <span className="text-slate-500 text-xs">/mo</span>
+                              <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto border-t sm:border-t-0 border-white/8 pt-3 sm:pt-0">
+                                <div>
+                                  <span className="text-white font-black">₹{b.amount.toLocaleString()}</span>
+                                  <span className="text-slate-500 text-xs">/mo</span>
+                                </div>
+                                <span className="text-xs px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-bold mt-1 shadow-glow-sm">
+                                  {b.status}
+                                </span>
                               </div>
-                              <span className="text-xs px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-bold mt-1 shadow-glow-sm">
-                                {b.status}
-                              </span>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )
                     )}
                   </motion.div>
                 )}

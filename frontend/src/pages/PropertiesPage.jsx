@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { featuredProperties } from '../data/sampleData';
+import { supabase } from '../services/supabase';
 import SkeletonCard from '../components/ui/SkeletonCard';
 
 const TYPES   = ['All', 'Apartment', 'Villa', 'Studio', 'PG', 'Commercial'];
@@ -89,15 +90,84 @@ function PropertyCard({ p, i }) {
 }
 
 export default function PropertiesPage() {
+  const [properties, setProperties] = useState([]);
   const [type,      setType]      = useState('All');
   const [sortBy,    setSortBy]    = useState('Newest');
   const [priceIdx,  setPriceIdx]  = useState(0);
   const [search,    setSearch]    = useState('');
-  const [loading]                 = useState(false);
+  const [loading,   setLoading]   = useState(true);
   const [sideOpen,  setSideOpen]  = useState(false);
+  const [searchParams]            = useSearchParams();
+
+  useEffect(() => {
+    const fetchProperties = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('properties')
+          .select('*');
+        
+        if (error) throw error;
+        
+        const mapped = (data || []).map(p => ({
+          ...p,
+          price: Number(p.rent),
+          verified: p.is_verified,
+          rating: Number(p.average_rating) || 4.5,
+          reviews: p.total_reviews || 0,
+          image: p.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+          tag: p.type === 'Villa' ? 'Popular' : p.type === 'Apartment' ? 'Premium' : 'Trending',
+          tagColor: p.type === 'Villa' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+        }));
+
+        // If no properties are in Supabase, fall back to sample properties
+        setProperties(mapped.length > 0 ? mapped : featuredProperties.map(p => ({
+          ...p,
+          rent: p.price,
+          is_verified: p.verified,
+          average_rating: p.rating,
+          total_reviews: p.reviews,
+          images: [p.image]
+        })));
+      } catch (err) {
+        console.error('Error fetching properties from Supabase:', err);
+        setProperties(featuredProperties.map(p => ({
+          ...p,
+          rent: p.price,
+          is_verified: p.verified,
+          average_rating: p.rating,
+          total_reviews: p.reviews,
+          images: [p.image]
+        })));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProperties();
+  }, []);
+
+  // Sync state with URL search parameters on mount or changes
+  useEffect(() => {
+    const loc = searchParams.get('location');
+    const t = searchParams.get('type');
+    const p = searchParams.get('price');
+
+    if (loc !== null) setSearch(loc);
+    if (t !== null && TYPES.includes(t)) setType(t);
+    if (p !== null) {
+      let idx = 0;
+      if (p.includes('10k') && (p.includes('Under') || p.includes('<'))) idx = 1;
+      else if (p.includes('10k') && p.includes('25k')) idx = 2;
+      else if (p.includes('25k') && p.includes('50k')) idx = 3;
+      else if (p.includes('50k') && p.includes('1L')) idx = 4;
+      else if (p.includes('1L') && (p.includes('Above') || p.includes('>'))) idx = 5;
+      setPriceIdx(idx);
+    }
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
-    let list = [...featuredProperties];
+    let list = [...properties];
     if (type !== 'All')   list = list.filter((p) => p.type === type);
     const pr = PRICES[priceIdx];
     list = list.filter((p) => p.price >= pr.min && p.price <= pr.max);
@@ -109,7 +179,7 @@ export default function PropertiesPage() {
     if (sortBy === 'Price: High–Low')  list.sort((a, b) => b.price - a.price);
     if (sortBy === 'Rating')           list.sort((a, b) => b.rating - a.rating);
     return list;
-  }, [type, priceIdx, search, sortBy]);
+  }, [properties, type, priceIdx, search, sortBy]);
 
   return (
     <div className="min-h-screen bg-slate-950 pt-20">
@@ -172,8 +242,8 @@ export default function PropertiesPage() {
                   <button key={t} onClick={() => setType(t)}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
                       type === t
-                        ? 'bg-primary-600/20 text-primary-300 border border-primary-500/30'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        ? 'bg-primary-100 text-primary-700 border border-primary-300 font-semibold'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border border-transparent'
                     }`}>
                     {t}
                   </button>
@@ -189,8 +259,8 @@ export default function PropertiesPage() {
                   <button key={p.label} onClick={() => setPriceIdx(i)}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
                       priceIdx === i
-                        ? 'bg-primary-600/20 text-primary-300 border border-primary-500/30'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        ? 'bg-primary-100 text-primary-700 border border-primary-300 font-semibold'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800 border border-transparent'
                     }`}>
                     {p.label}
                   </button>
@@ -218,8 +288,8 @@ export default function PropertiesPage() {
                 onClick={() => setType(t)}
                 className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   type === t
-                    ? 'bg-primary-600 text-white'
-                    : 'glass text-slate-400 hover:text-white border border-white/8'
+                    ? 'bg-primary-600 text-white shadow-sm font-semibold'
+                    : 'glass text-slate-400 hover:text-slate-100 hover:bg-slate-800 border border-slate-700/60'
                 }`}
               >
                 {t}

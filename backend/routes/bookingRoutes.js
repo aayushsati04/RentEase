@@ -7,14 +7,20 @@ const {
   updateBookingStatus,
   deleteBooking
 } = require('../controllers/bookingController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
+const {
+  createBookingValidator,
+  updateBookingStatusValidator,
+  bookingIdParamValidator
+} = require('../validations/bookingValidation');
+const validate = require('../middleware/validate');
 
 router.use(protect); // All booking routes require authentication
 
-router.post('/', createBooking);
+router.post('/', createBookingValidator, validate, createBooking);
 router.get('/', getBookings);
-router.get('/:id', getBooking);
-router.put('/:id', updateBookingStatus);
-router.delete('/:id', deleteBooking);
+router.get('/:id', bookingIdParamValidator, validate, getBooking);
+router.put('/:id', updateBookingStatusValidator, validate, updateBookingStatus);
+router.delete('/:id', bookingIdParamValidator, validate, deleteBooking);
 
 module.exports = router;
