@@ -165,7 +165,7 @@ export default function CheckoutPage() {
         bookingId: booking._id,
         amount: total,
         paymentMethod: 'card'
-      });
+      }, { baseURL: '' });
 
       const paymentSession = sessionRes.data.data;
       if (!paymentSession) {
@@ -185,7 +185,7 @@ export default function CheckoutPage() {
               razorpay_payment_id: mockPaymentId,
               razorpay_order_id: paymentSession.razorpayOrderId,
               razorpay_signature: mockSignature
-            });
+            }, { baseURL: '' });
 
             if (verifyRes.data.success) {
               setTxnId(mockPaymentId);
@@ -229,7 +229,7 @@ export default function CheckoutPage() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature
-            });
+            }, { baseURL: '' });
 
             if (verifyRes.data.success) {
               setTxnId(response.razorpay_payment_id);

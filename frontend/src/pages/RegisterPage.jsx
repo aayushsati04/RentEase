@@ -296,18 +296,18 @@ export default function RegisterPage() {
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-              <span className="text-white font-black">RE</span>
+              <span className="text-white font-black keep-white">RE</span>
             </div>
-            <span className="text-2xl font-black text-white">RentEase</span>
+            <span className="text-2xl font-black text-white keep-white">RentEase</span>
           </Link>
         </div>
 
         <div className="relative z-10">
-          <h2 className="text-4xl font-black text-white leading-tight mb-4">
+          <h2 className="text-4xl font-black text-white leading-tight mb-4 keep-white">
             Start Your<br />
             <span className="text-primary-300">Journey Today</span>
           </h2>
-          <p className="text-slate-300 text-base leading-relaxed mb-8">
+          <p className="text-slate-800 text-base leading-relaxed mb-8">
             Create your free account and get instant access to thousands of verified properties across India.
           </p>
 
@@ -330,7 +330,7 @@ export default function RegisterPage() {
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
               </div>
-              <span className="text-slate-200 text-sm">{item}</span>
+              <span className="text-slate-700 text-sm">{item}</span>
             </motion.div>
           ))}
         </div>
@@ -349,8 +349,8 @@ export default function RegisterPage() {
             </div>
             <div className="flex text-amber-400 text-sm">★★★★★</div>
           </div>
-          <p className="text-slate-300 text-sm">
-            <span className="text-white font-semibold">50,000+ users</span> have already found their perfect rental on RentEase
+          <p className="text-slate-800 text-sm">
+            <span className="text-white font-semibold keep-white">50,000+ users</span> have already found their perfect rental on RentEase
           </p>
         </div>
       </motion.div>

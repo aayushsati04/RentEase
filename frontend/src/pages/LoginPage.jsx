@@ -67,18 +67,18 @@ export default function LoginPage() {
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-              <span className="text-white font-black">RE</span>
+              <span className="text-white font-black keep-white">RE</span>
             </div>
-            <span className="text-2xl font-black text-white">RentEase</span>
+            <span className="text-2xl font-black text-white keep-white">RentEase</span>
           </Link>
         </div>
 
         <div className="relative z-10">
-          <h2 className="text-4xl font-black text-white leading-tight mb-4">
+          <h2 className="text-4xl font-black text-white leading-tight mb-4 keep-white">
             Your Dream Rental<br />
             <span className="text-primary-300">Awaits You</span>
           </h2>
-          <p className="text-slate-300 text-base leading-relaxed mb-10">
+          <p className="text-slate-800 text-base leading-relaxed mb-10">
             Join thousands of happy tenants and landlords who trust RentEase for seamless property rentals.
           </p>
 
@@ -93,7 +93,7 @@ export default function LoginPage() {
                 className="flex items-center gap-3"
               >
                 <span className="text-xl">{b.icon}</span>
-                <span className="text-slate-200 text-sm font-medium">{b.text}</span>
+                <span className="text-slate-700 text-sm font-medium">{b.text}</span>
               </motion.li>
             ))}
           </ul>
@@ -107,8 +107,8 @@ export default function LoginPage() {
             { val: '4.9★', label: 'Rating' },
           ].map((s) => (
             <div key={s.label} className="text-center glass rounded-xl p-4">
-              <div className="text-white font-black text-xl">{s.val}</div>
-              <div className="text-slate-400 text-xs mt-1">{s.label}</div>
+              <div className="text-white font-black text-xl keep-white">{s.val}</div>
+              <div className="text-slate-600 text-xs mt-1">{s.label}</div>
             </div>
           ))}
         </div>
