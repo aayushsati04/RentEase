@@ -21,6 +21,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import ChatPage from './pages/ChatPage';
 import CheckoutPage from './pages/CheckoutPage';
 import AboutPage from './pages/AboutPage';
+import AIChatbot from './components/ui/AIChatbot';
 
 function App() {
   return (
@@ -73,6 +74,9 @@ function App() {
 
           {/* Premium Site Footer */}
           <Footer />
+
+          {/* AI Assistant Chatbot */}
+          <AIChatbot />
 
         </div>
       </Router>
