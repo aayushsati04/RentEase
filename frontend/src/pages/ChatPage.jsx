@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import API from '../services/api';
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -38,15 +39,11 @@ export default function ChatPage() {
     const fetchProfiles = async () => {
       try {
         if (!user) return;
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .neq('id', user.id);
+        const { data: response } = await API.get('/api/auth/users');
+        const data = response.data || [];
 
-        if (error) throw error;
-        
-        const contactsList = (data || []).map(p => ({
-          id: p.id,
+        const contactsList = data.map(p => ({
+          id: p._id,
           name: p.name,
           avatar: `https://images.unsplash.com/photo-${p.role === 'landlord' ? '1507003211169-0a1dd7228f2d' : '1494790108377-be9c29b29330'}?w=100&q=80`,
           property: p.role === 'landlord' ? 'Landlord / Partner' : 'Renter / Tenant',

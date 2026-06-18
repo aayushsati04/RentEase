@@ -59,3 +59,35 @@ exports.getUserProfile = asyncHandler(async (req, res, next) => {
     role: result.role
   });
 });
+
+// @desc    Sync Supabase user with MongoDB
+// @route   POST /api/auth/supabase-sync
+// @access  Public
+exports.supabaseSyncUser = asyncHandler(async (req, res, next) => {
+  const result = await authService.syncSupabaseUser(req.body);
+
+  res.status(200).json({
+    success: true,
+    message: 'User synced successfully',
+    data: result,
+    _id: result._id,
+    name: result.name,
+    email: result.email,
+    phone: result.phone,
+    role: result.role,
+    token: result.token
+  });
+});
+
+// @desc    Get all users except currently logged in user
+// @route   GET /api/auth/users
+// @access  Private
+exports.getAllUsersExceptSelf = asyncHandler(async (req, res, next) => {
+  const result = await authService.getAllUsersExceptSelf(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Users retrieved successfully',
+    data: result
+  });
+});

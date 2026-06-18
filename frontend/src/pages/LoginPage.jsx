@@ -12,7 +12,7 @@ const BENEFITS = [
 ];
 
 export default function LoginPage() {
-  const { login }               = useAuth();
+  const { login, loginWithGoogle }               = useAuth();
   const navigate                = useNavigate();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -161,6 +161,13 @@ export default function LoginPage() {
               <button
                 key={provider.name}
                 type="button"
+                onClick={() => {
+                  if (provider.name === 'Google') {
+                    loginWithGoogle();
+                  } else {
+                    toast.error(`${provider.name} login is not implemented yet.`);
+                  }
+                }}
                 className="flex items-center justify-center gap-2.5 px-4 py-3 glass rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-white/8 transition-all border border-white/8"
               >
                 {provider.icon}

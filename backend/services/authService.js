@@ -72,6 +72,56 @@ class AuthService {
       role: user.role
     };
   }
+
+  async syncSupabaseUser(userData) {
+    const { email, name, phone, role } = userData;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create new user in MongoDB since they signed up via Supabase (or OAuth)
+      // Generate a random password since Supabase handles authentication
+      const randomPassword = require('crypto').randomBytes(16).toString('hex');
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        password: randomPassword,
+        phone: phone || '0000000000',
+        role: role || 'tenant'
+      });
+    } else {
+      // Optionally update details if they changed
+      let updated = false;
+      if (name && user.name !== name) {
+        user.name = name;
+        updated = true;
+      }
+      if (phone && user.phone !== phone) {
+        user.phone = phone;
+        updated = true;
+      }
+      if (role && user.role !== role) {
+        user.role = role;
+        updated = true;
+      }
+      if (updated) {
+        await user.save();
+      }
+    }
+
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      token: generateToken(user._id)
+    };
+  }
+
+  async getAllUsersExceptSelf(currentUserId) {
+    return await User.find({ _id: { $ne: currentUserId } }).select('-password');
+  }
 }
 
 module.exports = new AuthService();

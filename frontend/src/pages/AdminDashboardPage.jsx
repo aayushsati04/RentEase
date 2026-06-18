@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import API from '../services/api';
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('approvals');
@@ -13,31 +14,29 @@ export default function AdminDashboardPage() {
     try {
       setLoading(true);
       
-      // 1. Fetch unverified listings for the approval queue
-      const { data: qData, error: qErr } = await supabase
-        .from('properties')
-        .select('*, owner:owner_id(name)')
-        .eq('is_verified', false);
+      // 1. Fetch unverified listings for the approval queue from backend
+      const { data: propRes } = await API.get('/api/admin/properties?isVerified=false');
+      const propertiesList = propRes.data || propRes.properties || [];
 
-      if (qErr) throw qErr;
-
-      const queueMapped = (qData || []).map(p => ({
-        id: p.id,
+      const queueMapped = propertiesList.map(p => ({
+        id: p._id,
         title: p.title,
-        host: p.owner?.name || 'Rohan Malhotra',
+        host: p.ownerId?.name || 'Rohan Malhotra',
         type: p.type,
         price: Number(p.rent),
-        date: p.created_at.split('T')[0]
+        date: p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]
       }));
       setQueue(queueMapped);
 
-      // 2. Aggregate statistics
-      const { count: usersCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-      const { count: liveCount } = await supabase.from('properties').select('*', { count: 'exact', head: true }).eq('is_verified', true);
+      // 2. Fetch aggregate statistics from backend
+      const { data: statsRes } = await API.get('/api/admin/dashboard');
+      const statsData = statsRes.data || {};
+      const usersCount = statsData.totalUsers || 0;
+      const liveCount = statsData.propertiesBreakdown?.verified || 0;
 
       setStats([
-        { label: 'Total Registered Users', value: (usersCount || 0).toString(), icon: '👥', color: 'from-blue-600/10 to-indigo-600/10' },
-        { label: 'Live Property Listings', value: (liveCount || 0).toString(), icon: '🏠', color: 'from-emerald-600/10 to-teal-600/10' },
+        { label: 'Total Registered Users', value: usersCount.toString(), icon: '👥', color: 'from-blue-600/10 to-indigo-600/10' },
+        { label: 'Live Property Listings', value: liveCount.toString(), icon: '🏠', color: 'from-emerald-600/10 to-teal-600/10' },
         { label: 'Queue For Approvals', value: queueMapped.length.toString(), icon: '⏳', color: 'from-amber-600/10 to-orange-600/10' },
         { label: 'System Check Logs', value: '0 Errors', icon: '🛡️', color: 'from-rose-600/10 to-pink-600/10' },
       ]);
@@ -55,12 +54,7 @@ export default function AdminDashboardPage() {
 
   const handleApprove = async (id, title) => {
     try {
-      const { error } = await supabase
-        .from('properties')
-        .update({ is_verified: true })
-        .eq('id', id);
-
-      if (error) throw error;
+      await API.put(`/api/admin/properties/${id}/verify`);
 
       setQueue(prev => prev.filter(item => item.id !== id));
       toast.success(`Approved: "${title}" is now live & verified!`);
@@ -75,12 +69,7 @@ export default function AdminDashboardPage() {
 
   const handleReject = async (id, title) => {
     try {
-      const { error } = await supabase
-        .from('properties')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await API.delete(`/api/properties/${id}`);
 
       setQueue(prev => prev.filter(item => item.id !== id));
       toast.error(`Rejected: "${title}" listing request declined.`);
