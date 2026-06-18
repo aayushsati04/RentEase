@@ -45,8 +45,15 @@ function PropertyCard({ p, i }) {
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           loading="lazy" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className="absolute top-3 left-3 flex gap-2">
-          <span className={`badge text-xs ${p.tagColor}`}>{p.tag}</span>
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+          <div className="flex gap-2">
+            <span className={`badge text-xs ${p.tagColor}`}>{p.tag}</span>
+          </div>
+          {p.virtualTourUrl && (
+            <span className="badge bg-violet-500/25 text-violet-300 border border-violet-500/30 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 shadow-glow-sm">
+              🥽 360° Tour Available
+            </span>
+          )}
         </div>
         <button
           onClick={() => setLiked((v) => !v)}
@@ -117,7 +124,8 @@ export default function PropertiesPage() {
           reviews: p.total_reviews || 0,
           image: p.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
           tag: p.type === 'Villa' ? 'Popular' : p.type === 'Apartment' ? 'Premium' : 'Trending',
-          tagColor: p.type === 'Villa' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+          tagColor: p.type === 'Villa' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
+          virtualTourUrl: p.virtual_tour_url || ''
         }));
 
         // If no properties are in Supabase, fall back to sample properties
@@ -127,7 +135,8 @@ export default function PropertiesPage() {
           is_verified: p.verified,
           average_rating: p.rating,
           total_reviews: p.reviews,
-          images: [p.image]
+          images: [p.image],
+          virtualTourUrl: p.virtualTourUrl || ''
         })));
       } catch (err) {
         console.error('Error fetching properties from Supabase:', err);
@@ -137,7 +146,8 @@ export default function PropertiesPage() {
           is_verified: p.verified,
           average_rating: p.rating,
           total_reviews: p.reviews,
-          images: [p.image]
+          images: [p.image],
+          virtualTourUrl: p.virtualTourUrl || ''
         })));
       } finally {
         setLoading(false);

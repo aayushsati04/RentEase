@@ -349,9 +349,12 @@ export default function UserDashboardPage() {
                                   <td className="px-6 py-4">
                                     <span className="text-amber-400">★ {p.rating}</span>
                                   </td>
-                                  <td className="px-6 py-4 text-right">
-                                    <button onClick={() => navigate(`/properties/${p.id}`)} className="text-xs px-3 py-1.5 bg-primary-600/20 text-primary-300 hover:text-white border border-primary-500/30 rounded-lg mr-2 transition-all">
+                                  <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                    <button onClick={() => navigate(`/properties/${p.id}`)} className="text-xs px-3 py-1.5 bg-primary-600/20 text-primary-300 hover:text-white border border-primary-500/30 rounded-lg transition-all">
                                       View
+                                    </button>
+                                    <button onClick={() => navigate(`/properties/edit/${p.id}`)} className="text-xs px-3 py-1.5 bg-violet-600/20 text-violet-300 hover:text-white border border-violet-500/30 rounded-lg transition-all">
+                                      Edit
                                     </button>
                                   </td>
                                 </tr>

@@ -46,13 +46,20 @@ function PropertyCard({ property, index }) {
                         opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
 
         {/* Top badges */}
-        <div className="absolute top-3 left-3 flex gap-2">
-          <span className={`badge text-xs ${property.tagColor}`}>
-            {property.tag}
-          </span>
-          {property.verified && (
-            <span className="badge bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs">
-              ✓ Verified
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+          <div className="flex gap-2">
+            <span className={`badge text-xs ${property.tagColor}`}>
+              {property.tag}
+            </span>
+            {property.verified && (
+              <span className="badge bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs">
+                ✓ Verified
+              </span>
+            )}
+          </div>
+          {property.virtualTourUrl && (
+            <span className="badge bg-violet-500/25 text-violet-300 border border-violet-500/30 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 shadow-glow-sm">
+              🥽 360° Tour Available
             </span>
           )}
         </div>

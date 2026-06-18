@@ -63,6 +63,10 @@ const propertySchema = new mongoose.Schema({
   totalReviews: {
     type: Number,
     default: 0
+  },
+  virtualTourUrl: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true

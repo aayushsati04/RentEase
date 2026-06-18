@@ -40,7 +40,11 @@ const createPropertyValidator = [
   body('amenities')
     .optional()
     .isArray()
-    .withMessage('Amenities must be provided as an array')
+    .withMessage('Amenities must be provided as an array'),
+  body('virtualTourUrl')
+    .optional({ checkFalsy: true })
+    .isURL()
+    .withMessage('Virtual tour must be a valid URL')
 ];
 
 const updatePropertyValidator = [
@@ -81,7 +85,11 @@ const updatePropertyValidator = [
   body('amenities')
     .optional()
     .isArray()
-    .withMessage('Amenities must be an array')
+    .withMessage('Amenities must be an array'),
+  body('virtualTourUrl')
+    .optional({ checkFalsy: true })
+    .isURL()
+    .withMessage('Virtual tour must be a valid URL')
 ];
 
 const propertyIdParamValidator = [

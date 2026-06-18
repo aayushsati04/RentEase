@@ -5,6 +5,7 @@ import { featuredProperties } from '../data/sampleData';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import VirtualTour from '../components/property/VirtualTour';
 
 export default function PropertyDetailsPage() {
   const { id } = useParams();
@@ -40,7 +41,8 @@ export default function PropertyDetailsPage() {
           image: data.images?.[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
           tag: data.type === 'Villa' ? 'Popular' : data.type === 'Apartment' ? 'Premium' : 'Trending',
           tagColor: data.type === 'Villa' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
-          hostName: data.owner?.name || 'Rohan Malhotra'
+          hostName: data.owner?.name || 'Rohan Malhotra',
+          virtualTourUrl: data.virtual_tour_url || ''
         };
         setProperty(mapped);
         setActiveImg(mapped.image);
@@ -54,7 +56,8 @@ export default function PropertyDetailsPage() {
           rating: found.rating,
           reviews: found.reviews,
           image: found.image,
-          hostName: 'Rohan Malhotra'
+          hostName: 'Rohan Malhotra',
+          virtualTourUrl: found.virtualTourUrl || ''
         };
         setProperty(fallback);
         setActiveImg(fallback.image);
@@ -238,6 +241,9 @@ export default function PropertyDetailsPage() {
                 </div>
               </div>
             </div>
+
+            {/* 360° Virtual Tour Section */}
+            <VirtualTour virtualTourUrl={property.virtualTourUrl} />
 
             {/* Description */}
             <div className="space-y-3">

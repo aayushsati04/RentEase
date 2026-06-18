@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
@@ -14,8 +14,11 @@ const STEPS = [
 
 export default function AddPropertyPage() {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+
+  const isEditMode = !!id;
 
   // Form State
   const [title, setTitle] = useState('');
@@ -29,6 +32,49 @@ export default function AddPropertyPage() {
   const [bedrooms, setBedrooms] = useState('2');
   const [bathrooms, setBathrooms] = useState('2');
   const [amenities, setAmenities] = useState([]);
+  const [virtualTourUrl, setVirtualTourUrl] = useState('');
+
+  useEffect(() => {
+    if (isEditMode) {
+      const fetchProperty = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('properties')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          if (error) throw error;
+          if (data) {
+            setTitle(data.title || '');
+            setDescription(data.description || '');
+            setType(data.type || 'Apartment');
+            if (data.location) {
+              const parts = data.location.split(',');
+              if (parts.length > 1) {
+                setCity(parts[parts.length - 1].trim());
+                setAddress(parts.slice(0, -1).join(',').trim());
+              } else {
+                setAddress(data.location);
+                setCity('');
+              }
+            }
+            setPrice(data.rent?.toString() || '');
+            setSecurityDeposit(Math.round(Number(data.rent || 0) * 1.5).toString());
+            setArea(data.area?.toString() || '');
+            setBedrooms(data.bedrooms?.toString() || '2');
+            setBathrooms(data.bathrooms?.toString() || '2');
+            setAmenities(data.amenities || []);
+            setVirtualTourUrl(data.virtual_tour_url || '');
+          }
+        } catch (err) {
+          console.error('Error fetching property for edit:', err);
+          toast.error('Failed to load property details for editing');
+        }
+      };
+      fetchProperty();
+    }
+  }, [id, isEditMode]);
 
   const toggleAmenity = (name) => {
     if (amenities.includes(name)) {
@@ -62,40 +108,51 @@ export default function AddPropertyPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) {
-      toast.error('Authentication required to create listings');
+      toast.error('Authentication required to manage listings');
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from('properties')
-        .insert({
-          owner_id: user.id,
-          title,
-          description,
-          rent: Number(price),
-          location: `${address}, ${city}`,
-          bedrooms: Number(bedrooms),
-          bathrooms: Number(bathrooms),
-          type,
-          area: Number(area),
-          amenities,
-          images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
-          status: 'available',
-          is_verified: false // Admin must approve
-        })
-        .select()
-        .single();
+      const payload = {
+        owner_id: user.id,
+        title,
+        description,
+        rent: Number(price),
+        location: city ? `${address}, ${city}` : address,
+        bedrooms: Number(bedrooms),
+        bathrooms: Number(bathrooms),
+        type,
+        area: Number(area),
+        amenities,
+        images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
+        virtual_tour_url: virtualTourUrl.trim(),
+        status: 'available',
+        is_verified: false // Admin must approve/re-approve
+      };
+
+      let error;
+      if (isEditMode) {
+        const { error: err } = await supabase
+          .from('properties')
+          .update(payload)
+          .eq('id', id);
+        error = err;
+      } else {
+        const { error: err } = await supabase
+          .from('properties')
+          .insert(payload);
+        error = err;
+      }
 
       if (error) throw error;
 
-      toast.success('Listing created successfully! Awaiting validation.');
+      toast.success(isEditMode ? 'Listing updated successfully!' : 'Listing created successfully! Awaiting validation.');
       setTimeout(() => {
         navigate('/dashboard');
       }, 1000);
     } catch (err) {
-      console.error('Error creating listing:', err);
-      toast.error(err.message || 'Failed to submit listing');
+      console.error('Error saving listing:', err);
+      toast.error(err.message || 'Failed to save listing');
     }
   };
 
@@ -148,8 +205,8 @@ export default function AddPropertyPage() {
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-1">Let's start with basic info</h2>
-                    <p className="text-slate-500 text-xs">Enter details about what kind of listing you want to create.</p>
+                    <h2 className="text-xl font-bold text-white mb-1">{isEditMode ? 'Edit basic details' : "Let's start with basic info"}</h2>
+                    <p className="text-slate-500 text-xs">{isEditMode ? 'Modify details about what kind of listing you want to edit.' : 'Enter details about what kind of listing you want to create.'}</p>
                   </div>
 
                   {/* Title */}
@@ -198,7 +255,7 @@ export default function AddPropertyPage() {
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-1">Where is the property?</h2>
+                    <h2 className="text-xl font-bold text-white mb-1">{isEditMode ? 'Update location' : 'Where is the property?'}</h2>
                     <p className="text-slate-500 text-xs">Tenants can lookup properties by city or address locales.</p>
                   </div>
 
@@ -234,7 +291,7 @@ export default function AddPropertyPage() {
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-1">Pricing & Specifications</h2>
+                    <h2 className="text-xl font-bold text-white mb-1">{isEditMode ? 'Update pricing & specs' : 'Pricing & Specifications'}</h2>
                     <p className="text-slate-500 text-xs">Fill details about monthly rents, size, and layout bedrooms.</p>
                   </div>
 
@@ -309,8 +366,8 @@ export default function AddPropertyPage() {
               {currentStep === 4 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-bold text-white mb-1">Amenities selection</h2>
-                    <p className="text-slate-500 text-xs">Tick all amenities that are accessible on this property.</p>
+                    <h2 className="text-xl font-bold text-white mb-1">{isEditMode ? 'Update Amenities & Tour' : 'Amenities & Virtual Tour'}</h2>
+                    <p className="text-slate-500 text-xs">Tick accessible amenities and add an optional virtual tour embed URL.</p>
                   </div>
 
                   {/* Checkboxes grid */}
@@ -343,6 +400,21 @@ export default function AddPropertyPage() {
                         </button>
                       );
                     })}
+                  </div>
+
+                  {/* Virtual Tour URL */}
+                  <div className="space-y-2">
+                    <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block">360° Virtual Tour URL</label>
+                    <input 
+                      type="url" 
+                      placeholder="e.g. https://my.matterport.com/show/?m=JGPm5Nz4Ax6"
+                      value={virtualTourUrl}
+                      onChange={(e) => setVirtualTourUrl(e.target.value)}
+                      className="input-field"
+                    />
+                    <p className="text-slate-500 text-[10px]">
+                      Provide a Matterport share link or any other 360° tour embed URL. This will render an interactive viewer.
+                    </p>
                   </div>
 
                   {/* Mock Upload Banner */}
@@ -383,10 +455,11 @@ export default function AddPropertyPage() {
                     onClick={handleSubmit}
                     className="btn-primary text-sm px-8 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 border border-emerald-500/20"
                   >
-                    Publish Listing ⚡
+                    {isEditMode ? 'Save Changes ⚡' : 'Publish Listing ⚡'}
                   </button>
                 )}
               </div>
+
 
             </motion.div>
           </AnimatePresence>

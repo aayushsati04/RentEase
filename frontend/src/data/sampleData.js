@@ -16,6 +16,7 @@ export const featuredProperties = [
     tagColor: 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
     amenities: ['Pool', 'Gym', 'Parking', 'Security'],
     verified: true,
+    virtualTourUrl: 'https://my.matterport.com/show/?m=JGPm5Nz4Ax6',
   },
   {
     id: 2,
@@ -33,6 +34,7 @@ export const featuredProperties = [
     tagColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
     amenities: ['Garden', 'Parking', 'Security', 'WiFi'],
     verified: true,
+    virtualTourUrl: 'https://my.matterport.com/show/?m=JGPm5Nz4Ax6',
   },
   {
     id: 3,

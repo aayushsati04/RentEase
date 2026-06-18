@@ -58,6 +58,7 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route path="/dashboard" element={<UserDashboardPage />} />
                 <Route path="/properties/add" element={<AddPropertyPage />} />
+                <Route path="/properties/edit/:id" element={<AddPropertyPage />} />
                 <Route path="/bookings" element={<BookingsDashboardPage />} />
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/payments/checkout/:id" element={<CheckoutPage />} />
