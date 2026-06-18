@@ -17,7 +17,93 @@ export default function BookingsDashboardPage() {
       try {
         setLoading(true);
         if (!user) return;
-        
+
+        if (user.isDemo) {
+          if (user.role === 'landlord' || user.role === 'owner') {
+            const sampleLandlordBks = [
+              {
+                id: 'demo-received-bk-1',
+                property: {
+                  id: 1,
+                  title: 'Luxury Penthouse Suite',
+                  location: 'Bandra West, Mumbai',
+                  price: 85000,
+                  image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+                  type: 'Apartment'
+                },
+                checkIn: '2026-06-01',
+                checkOut: '2026-12-01',
+                status: 'Paid',
+                badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+                totalRent: 85000,
+                hostName: 'Rajesh Sharma',
+                payUrl: null
+              },
+              {
+                id: 'demo-received-bk-2',
+                property: {
+                  id: 3,
+                  title: 'Contemporary Studio Loft',
+                  location: 'Indiranagar, Bangalore',
+                  price: 22000,
+                  image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
+                  type: 'Studio'
+                },
+                checkIn: '2026-07-10',
+                checkOut: '2026-10-10',
+                status: 'Approved & Unpaid',
+                badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+                totalRent: 22000,
+                hostName: 'Rajesh Sharma',
+                payUrl: null
+              }
+            ];
+            setBookings(sampleLandlordBks);
+          } else {
+            const sampleTenantBks = [
+              {
+                id: 'demo-tenant-bk-1',
+                property: {
+                  id: 1,
+                  title: 'Luxury Penthouse Suite',
+                  location: 'Bandra West, Mumbai',
+                  price: 85000,
+                  image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+                  type: 'Apartment'
+                },
+                checkIn: '2026-06-01',
+                checkOut: '2026-12-01',
+                status: 'Paid',
+                badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+                totalRent: 85000,
+                hostName: 'Rohan Malhotra',
+                payUrl: null
+              },
+              {
+                id: 'demo-tenant-bk-2',
+                property: {
+                  id: 2,
+                  title: 'Modern Sea-View Villa',
+                  location: 'Koregaon Park, Pune',
+                  price: 65000,
+                  image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80',
+                  type: 'Villa'
+                },
+                checkIn: '2026-07-01',
+                checkOut: '2026-08-01',
+                status: 'Approved & Unpaid',
+                badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+                totalRent: 65000,
+                hostName: 'Rahul Mehta',
+                payUrl: `/payments/checkout/2?months=1&total=163750&in=2026-07-01&out=2026-08-01`
+              }
+            ];
+            setBookings(sampleTenantBks);
+          }
+          setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('bookings')
           .select('*, property:property_id(*, owner:owner_id(name))')

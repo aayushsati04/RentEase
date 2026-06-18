@@ -39,6 +39,49 @@ export default function ChatPage() {
     const fetchProfiles = async () => {
       try {
         if (!user) return;
+
+        if (user.isDemo) {
+          const isLandlord = user.role === 'landlord' || user.role === 'owner';
+          const contactsList = isLandlord ? [
+            {
+              id: 'priya-sharma-demo-uuid',
+              name: 'Priya Sharma',
+              avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80',
+              property: 'Luxury Penthouse Suite',
+              online: true,
+              lastMsg: 'Is the deposit negotiable?'
+            },
+            {
+              id: 'vikram-singh-demo-uuid',
+              name: 'Vikram Singh',
+              avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&q=80',
+              property: 'Modern Sea-View Villa',
+              online: false,
+              lastMsg: 'Let me check my calendar.'
+            }
+          ] : [
+            {
+              id: 'rohan-malhotra-demo-uuid',
+              name: 'Rohan Malhotra',
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&q=80',
+              property: 'Luxury Penthouse Suite',
+              online: true,
+              lastMsg: 'Let me know your preferred move-in schedule.'
+            },
+            {
+              id: 'rahul-mehta-demo-uuid',
+              name: 'Rahul Mehta',
+              avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80',
+              property: 'Modern Sea-View Villa',
+              online: true,
+              lastMsg: "Sure, let's schedule a site visit tomorrow."
+            }
+          ];
+          setProfiles(contactsList);
+          setActiveContactId(contactsList[0].id);
+          return;
+        }
+
         const { data: response } = await API.get('/api/auth/users');
         const data = response.data || [];
 
@@ -74,6 +117,42 @@ export default function ChatPage() {
       try {
         if (!user || !activeContactId) return;
 
+        if (user.isDemo) {
+          const nowStr = new Date();
+          const t1 = new Date(nowStr - 600000).toISOString();
+          const t2 = new Date(nowStr - 300000).toISOString();
+          const t3 = new Date(nowStr - 60000).toISOString();
+
+          let mockMsgs = [];
+          if (activeContactId === 'rohan-malhotra-demo-uuid') {
+            mockMsgs = [
+              { sender_id: 'rohan-malhotra-demo-uuid', receiver_id: user.id, message: 'Hello! Welcome to RentEase. Are you interested in the Luxury Penthouse Suite?', created_at: t1 },
+              { sender_id: user.id, receiver_id: 'rohan-malhotra-demo-uuid', message: 'Yes, it looks amazing. What is the minimum lease term?', created_at: t2 },
+              { sender_id: 'rohan-malhotra-demo-uuid', receiver_id: user.id, message: 'We require a minimum 6-month lease. Let me know your preferred move-in schedule.', created_at: t3 }
+            ];
+          } else if (activeContactId === 'rahul-mehta-demo-uuid') {
+            mockMsgs = [
+              { sender_id: 'rahul-mehta-demo-uuid', receiver_id: user.id, message: 'Hey there! I saw you liked the Modern Sea-View Villa.', created_at: t1 },
+              { sender_id: user.id, receiver_id: 'rahul-mehta-demo-uuid', message: 'Yes! Can we schedule a viewing this weekend?', created_at: t2 },
+              { sender_id: 'rahul-mehta-demo-uuid', receiver_id: user.id, message: "Sure, let's schedule a site visit tomorrow.", created_at: t3 }
+            ];
+          } else if (activeContactId === 'priya-sharma-demo-uuid') {
+            mockMsgs = [
+              { sender_id: 'priya-sharma-demo-uuid', receiver_id: user.id, message: 'Hello! I am very interested in your Penthouse.', created_at: t1 },
+              { sender_id: user.id, receiver_id: 'priya-sharma-demo-uuid', message: 'Hi Priya! Thanks for reaching out. Do you have any questions?', created_at: t2 },
+              { sender_id: 'priya-sharma-demo-uuid', receiver_id: user.id, message: 'Yes, is the deposit negotiable?', created_at: t3 }
+            ];
+          } else if (activeContactId === 'vikram-singh-demo-uuid') {
+            mockMsgs = [
+              { sender_id: 'vikram-singh-demo-uuid', receiver_id: user.id, message: 'Hi, is this Sea-view Villa still available for July?', created_at: t1 },
+              { sender_id: user.id, receiver_id: 'vikram-singh-demo-uuid', message: 'Yes, it is available. Would you like to schedule a call?', created_at: t2 },
+              { sender_id: 'vikram-singh-demo-uuid', receiver_id: user.id, message: 'Let me check my calendar.', created_at: t3 }
+            ];
+          }
+          setMessages(mockMsgs);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('chats')
           .select('*')
@@ -92,7 +171,7 @@ export default function ChatPage() {
 
   // 3. Subscribe to Realtime database inserts for instant chat synchronization
   useEffect(() => {
-    if (!user || !activeContactId) return;
+    if (!user || !activeContactId || user.isDemo) return;
 
     const channel = supabase
       .channel(`chat-room-${activeContactId}`)
@@ -135,6 +214,38 @@ export default function ChatPage() {
     setInputText('');
 
     try {
+      if (user.isDemo || activeContactId.includes('demo') || activeContactId.includes('mock')) {
+        const userMsg = {
+          sender_id: user.id,
+          receiver_id: activeContactId,
+          message: messageText,
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, userMsg]);
+
+        // Update contacts lastMsg locally
+        setProfiles(prev => prev.map(p => p.id === activeContactId ? { ...p, lastMsg: messageText } : p));
+
+        // Simulate auto-reply typing effect
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          const replyText = `Thanks for your message: "${messageText}". I am currently away, but I will review this shortly! Let me know if you would like to schedule a call.`;
+          const replyMsg = {
+            sender_id: activeContactId,
+            receiver_id: user.id,
+            message: replyText,
+            created_at: new Date().toISOString()
+          };
+          setMessages(prev => [...prev, replyMsg]);
+
+          // Update contacts lastMsg locally for the reply
+          setProfiles(prev => prev.map(p => p.id === activeContactId ? { ...p, lastMsg: replyText } : p));
+        }, 1500);
+
+        return;
+      }
+
       const { error } = await supabase
         .from('chats')
         .insert({

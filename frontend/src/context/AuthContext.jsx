@@ -4,6 +4,8 @@ import API from '../services/api';
 
 const AuthContext = createContext(null);
 
+const DEMO_MODE = true;
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,9 +69,18 @@ export const AuthProvider = ({ children }) => {
     // Check active session on mount
     const checkSession = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (token === 'demo-token') {
+          const demoUser = JSON.parse(localStorage.getItem('demo_user'));
+          if (demoUser) {
+            setUser(demoUser);
+            setLoading(false);
+            return;
+          }
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          const token = localStorage.getItem('token');
           let profile = null;
           if (token) {
             profile = await fetchBackendProfile();
@@ -92,9 +103,18 @@ export const AuthProvider = ({ children }) => {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const token = localStorage.getItem('token');
+      if (token === 'demo-token') {
+        const demoUser = JSON.parse(localStorage.getItem('demo_user'));
+        if (demoUser) {
+          setUser(demoUser);
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
       if (session?.user) {
-        const token = localStorage.getItem('token');
         let profile = null;
         if (token) {
           profile = await fetchBackendProfile();
@@ -117,6 +137,23 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
+      if (DEMO_MODE && (email === 'brahmanaayush@gmail.com' || email === 'rajesh.sharma@property.com') && password === 'demo123') {
+        const isTenant = email === 'brahmanaayush@gmail.com';
+        const mockUser = {
+          id: isTenant ? 'demo-tenant-id' : 'demo-landlord-id',
+          _id: isTenant ? 'demo-tenant-id' : 'demo-landlord-id',
+          name: isTenant ? 'Aayush Sati' : 'Rajesh Sharma',
+          email: email,
+          phone: '9876543210',
+          role: isTenant ? 'tenant' : 'landlord',
+          isDemo: true
+        };
+        localStorage.setItem('token', 'demo-token');
+        localStorage.setItem('demo_user', JSON.stringify(mockUser));
+        setUser(mockUser);
+        return { success: true };
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -197,6 +234,13 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('token');
+      if (token === 'demo-token') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('demo_user');
+        setUser(null);
+        return;
+      }
       await supabase.auth.signOut();
       localStorage.removeItem('token');
       setUser(null);
@@ -215,3 +259,4 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
+

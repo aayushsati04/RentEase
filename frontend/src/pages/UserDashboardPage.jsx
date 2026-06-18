@@ -13,12 +13,123 @@ export default function UserDashboardPage() {
   const [properties, setProperties] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [stats, setStats] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
         if (!user) return;
+
+        if (user.isDemo) {
+          if (user.role === 'landlord' || user.role === 'owner') {
+            const sampleProps = [
+              {
+                id: 1,
+                title: 'Luxury Penthouse Suite',
+                location: 'Bandra West, Mumbai',
+                rent: 85000,
+                price: 85000,
+                images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
+                image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+                rating: 4.9,
+                reviews: 127,
+              },
+              {
+                id: 2,
+                title: 'Modern Sea-View Villa',
+                location: 'Koregaon Park, Pune',
+                rent: 65000,
+                price: 65000,
+                images: ['https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80'],
+                image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80',
+                rating: 4.8,
+                reviews: 89,
+              },
+              {
+                id: 3,
+                title: 'Contemporary Studio Loft',
+                location: 'Indiranagar, Bangalore',
+                rent: 22000,
+                price: 22000,
+                images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80'],
+                image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
+                rating: 4.7,
+                reviews: 214,
+              }
+            ];
+            setProperties(sampleProps);
+            setStats([
+              { label: 'Total Listings', value: '3', icon: '🏢', color: 'from-blue-600/20 to-indigo-600/20' },
+              { label: 'Monthly Earnings', value: '₹1.50L', icon: '📈', color: 'from-emerald-600/20 to-teal-600/20' },
+              { label: 'Pending Bookings', value: '1', icon: '⏳', color: 'from-amber-600/20 to-orange-600/20' },
+              { label: 'Average Rating', value: '4.8 ★', icon: '⭐', color: 'from-violet-600/20 to-purple-600/20' },
+            ]);
+          } else {
+            const sampleBks = [
+              {
+                id: 'demo-booking-1',
+                property: {
+                  id: 1,
+                  title: 'Luxury Penthouse Suite',
+                  location: 'Bandra West, Mumbai',
+                  image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80',
+                  rent: 85000,
+                },
+                checkIn: '2026-06-01',
+                checkOut: '2026-12-01',
+                status: 'Paid',
+                amount: 85000
+              },
+              {
+                id: 'demo-booking-2',
+                property: {
+                  id: 2,
+                  title: 'Modern Sea-View Villa',
+                  location: 'Koregaon Park, Pune',
+                  image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80',
+                  rent: 65000,
+                },
+                checkIn: '2026-07-01',
+                checkOut: '2026-08-01',
+                status: 'Approved & Unpaid',
+                amount: 65000
+              }
+            ];
+            setBookings(sampleBks);
+            
+            const sampleWishlist = [
+              {
+                id: 3,
+                title: 'Contemporary Studio Loft',
+                location: 'Indiranagar, Bangalore',
+                price: 22000,
+                type: 'Studio',
+                rating: 4.7,
+                image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80',
+              },
+              {
+                id: 6,
+                title: 'Garden-Facing 2BHK Apartment',
+                location: 'Whitefield, Bangalore',
+                price: 35000,
+                type: 'Apartment',
+                rating: 4.8,
+                image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80',
+              }
+            ];
+            setWishlist(sampleWishlist);
+
+            setStats([
+              { label: 'Active Rentals', value: '1', icon: '🏠', color: 'from-blue-600/20 to-indigo-600/20' },
+              { label: 'Unpaid Bookings', value: '1', icon: '⏳', color: 'from-rose-600/20 to-pink-600/20' },
+              { label: 'Unread Chats', value: '2', icon: '💬', color: 'from-emerald-600/20 to-teal-600/20' },
+              { label: 'Rent Paid (YTD)', value: '₹85.0k', icon: '💳', color: 'from-amber-600/20 to-orange-600/20' },
+            ]);
+          }
+          setLoading(false);
+          return;
+        }
 
         if (user.role === 'landlord' || user.role === 'owner') {
           // Fetch landlord listings
@@ -273,6 +384,16 @@ export default function UserDashboardPage() {
                 >
                   {isLandlord ? 'My Listed Properties' : 'My Active Bookings'}
                 </button>
+                {!isLandlord && (
+                  <button
+                    onClick={() => setActiveTab('wishlist')}
+                    className={`pb-3 font-semibold text-sm transition-all border-b-2 ${
+                      activeTab === 'wishlist' ? 'text-primary-400 border-primary-500' : 'text-slate-500 border-transparent hover:text-white'
+                    }`}
+                  >
+                    My Wishlist
+                  </button>
+                )}
               </div>
 
               {/* Tab Contents */}
@@ -305,7 +426,7 @@ export default function UserDashboardPage() {
                       </div>
                     </div>
                   </motion.div>
-                ) : (
+                ) : activeTab === 'listings' ? (
                   <motion.div
                     key="listings"
                     initial={{ opacity: 0, y: 10 }}
@@ -401,6 +522,53 @@ export default function UserDashboardPage() {
                           ))}
                         </div>
                       )
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="wishlist"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    {wishlist.length === 0 ? (
+                      <div className="text-center py-16 bg-white/2 rounded-3xl border border-dashed border-slate-800">
+                        <p className="text-slate-400 text-sm mb-4">Your wishlist is empty.</p>
+                        <Link to="/properties" className="btn-primary text-xs py-2 px-4 inline-block font-semibold">
+                          Explore Properties
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {wishlist.map((item) => (
+                          <div key={item.id} className="group glass-card rounded-2xl overflow-hidden border border-white/8 hover:border-primary-500/30 transition-all duration-300">
+                            <div className="relative h-44 overflow-hidden">
+                              <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                              <div className="absolute top-2 left-2">
+                                <span className="text-[10px] bg-slate-900/90 text-white font-bold px-2 py-0.5 rounded-lg border border-white/10">
+                                  {item.type}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h4 className="text-white font-bold text-sm line-clamp-1">{item.title}</h4>
+                                <span className="text-amber-400 text-xs shrink-0">★ {item.rating}</span>
+                              </div>
+                              <p className="text-slate-500 text-xs truncate mb-3">📍 {item.location}</p>
+                              <div className="flex justify-between items-center pt-3 border-t border-white/4">
+                                <div>
+                                  <span className="text-white font-black text-sm">₹{item.price.toLocaleString()}</span>
+                                  <span className="text-slate-500 text-[10px]">/mo</span>
+                                </div>
+                                <button onClick={() => navigate(`/properties/${item.id}`)} className="text-[11px] px-3 py-1.5 bg-primary-600/25 text-primary-300 hover:text-white border border-primary-500/30 rounded-lg transition-all">
+                                  View Property
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </motion.div>
                 )}
